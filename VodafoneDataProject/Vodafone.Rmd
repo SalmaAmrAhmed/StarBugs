@@ -1,0 +1,27 @@
+---
+title: "Vodafone"
+output: html_document
+---
+
+
+
+```{r}
+library("dplyr")
+library("ggplot2")
+
+```
+
+Reading csv files 
+
+```{r}
+
+contract_ref <- read.csv("contract_ref.csv")
+daily_aggregate <- read.csv("daily_aggregate.csv")
+roaming_monthly <- read.csv("roaming_monthly.csv")
+test <- read.csv("test.csv")
+train <- read.csv("train.csv")
+
+
+```
+
+
