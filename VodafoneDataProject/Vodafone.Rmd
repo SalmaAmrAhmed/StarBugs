@@ -37,6 +37,8 @@ train <- read.csv("train.csv")
 
 newTrain<- dplyr::right_join(contract_ref, train, by = "CONTRACT_KEY")
 newTrain<- dplyr::right_join(daily_aggregate, newTrain, by = "CONTRACT_KEY")
+newTest<- dplyr::right_join(contract_ref, test, by = "CONTRACT_KEY")
+newTest<- dplyr::right_join(daily_aggregate, newTest, by = "CONTRACT_KEY")
 ```
 
 We have two approaches,
@@ -54,6 +56,11 @@ summary(newTrain$VALUE_SEGMENT)
 newTrainFiltered = filter(newTrain, !is.na(VALUE_SEGMENT))
  
 newTrainFiltered = filter(newTrainFiltered, VALUE_SEGMENT != "N/A")
+
+summary(newTrain$VALUE_SEGMENT)
+newTestFiltered = filter(newTest, !is.na(VALUE_SEGMENT))
+ 
+newTestFiltered = filter(newTestFiltered, VALUE_SEGMENT != "N/A")
 ```
 
 ```{r}
@@ -61,25 +68,27 @@ newTrainFiltered = filter(newTrainFiltered, VALUE_SEGMENT != "N/A")
 
 dailyTrainModel <- dplyr::select(newTrainFiltered, -c(X206_SESSION_COUNT, X206_USAGE, X207_USAGE, X208_SESSION_COUNT, X209_USAGE, X209_SESSION_COUNT, X210_USAGE, X210_SESSION_COUNT, CALL_DATE_KEY, X207_SESSION_COUNT, X208_USAGE, NO_OF_SESSIONS, CELL_KEY))
 
-names
-dailyTrainModel$TARGET = as.factor(dailyTrainModel$TARGET)
+dailyTestModel <- dplyr::select(newTestFiltered, -c(X206_SESSION_COUNT, X206_USAGE, X207_USAGE, X208_SESSION_COUNT, X209_USAGE, X209_SESSION_COUNT, X210_USAGE, X210_SESSION_COUNT, CALL_DATE_KEY, X207_SESSION_COUNT, X208_USAGE, NO_OF_SESSIONS, CELL_KEY))
+dailyTestModel$TARGET = as.factor(dailyTestModel$TARGET)
 dailyTrainModel1 = dailyTrainModel
 
-dailyTrainModel = sample_n(dailyTrainModel1, 10000)
-dailyTrainModelTrained = sample_n(dailyTrainModel1, 5000)
-dailyTrainModelTest =  sample_n(dailyTrainModel1, 500)
-dailyTrainModelTest = dplyr::select(dailyTrainModelTest, -c(dailyTrainModelTest$TARGET))
+dailyTrainModel = sample_n(dailyTrainModel1, 1000)
+dailyTrainModelTrained = sample_n(dailyTrainModel1, 900)
+dailyTrainModelTest =  sample_n(dailyTrainModel1, 100)
+dailyTrainModelTestOriginal =  dailyTrainModelTest
+dailyTrainModelTest = dplyr::select(dailyTrainModelTest, -c(TARGET))
 
-set.seed(42)
+set.seed(1)
 #daily.svm <- svm(TARGET~ ., data=dailyTrainModel)
 trained <- trainControl(method = "cv", number = 10)
-daily.rf <- train(TARGET~ ., data = dailyTrainModelTrained, method = "rf", trControl = trained)
+daily <- train(TARGET~ ., data = dailyTrainModelTrained, method = "svmLinear2", trControl = trained)
 summary(daily.rf)
-predictions.randomforest <- predict(daily.rf, dailyTrainModelTest, "raw")
+predictions.randomforest <- predict(daily, dailyTestModel, "raw")
 
 
 
 
+m <- table(predictions.randomforest, dailyTrainModelTestOriginal$TARGET )
 
 
 ```
