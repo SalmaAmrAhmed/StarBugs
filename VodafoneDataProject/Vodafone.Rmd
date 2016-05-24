@@ -8,6 +8,15 @@ output: html_document
 ```{r}
 library("dplyr")
 library("ggplot2")
+library('randomForest')
+library('rpart')
+library('dismo')
+library('randomForest')
+library('e1071')
+library('adabag')
+library('caret')
+library('ipred')
+library('C50')
 
 ```
 
@@ -21,7 +30,122 @@ roaming_monthly <- read.csv("roaming_monthly.csv")
 test <- read.csv("test.csv")
 train <- read.csv("train.csv")
 
-
 ```
 
 
+```{r}
+
+newTrain<- dplyr::right_join(contract_ref, train, by = "CONTRACT_KEY")
+newTrain<- dplyr::right_join(daily_aggregate, newTrain, by = "CONTRACT_KEY")
+```
+
+We have two approaches,
+
+1- monthly 
+2- daily
+
+Firstly we will start with the analysis through daily consumption
+
+Starting through removing redundant rows and NAs for valeu segments
+
+
+```{r}
+summary(newTrain$VALUE_SEGMENT)
+newTrainFiltered = filter(newTrain, !is.na(VALUE_SEGMENT))
+ 
+newTrainFiltered = filter(newTrainFiltered, VALUE_SEGMENT != "N/A")
+```
+
+```{r}
+
+
+dailyTrainModel <- dplyr::select(newTrainFiltered, -c(X206_SESSION_COUNT, X206_USAGE, X207_USAGE, X208_SESSION_COUNT, X209_USAGE, X209_SESSION_COUNT, X210_USAGE, X210_SESSION_COUNT, CALL_DATE_KEY, X207_SESSION_COUNT, X208_USAGE, NO_OF_SESSIONS, CELL_KEY))
+
+names
+dailyTrainModel$TARGET = as.factor(dailyTrainModel$TARGET)
+dailyTrainModel1 = dailyTrainModel
+
+dailyTrainModel = sample_n(dailyTrainModel1, 10000)
+dailyTrainModelTrained = sample_n(dailyTrainModel1, 5000)
+dailyTrainModelTest =  sample_n(dailyTrainModel1, 500)
+dailyTrainModelTest = dplyr::select(dailyTrainModelTest, -c(dailyTrainModelTest$TARGET))
+
+set.seed(42)
+#daily.svm <- svm(TARGET~ ., data=dailyTrainModel)
+trained <- trainControl(method = "cv", number = 10)
+daily.rf <- train(TARGET~ ., data = dailyTrainModelTrained, method = "rf", trControl = trained)
+summary(daily.rf)
+predictions.randomforest <- predict(daily.rf, dailyTrainModelTest, "raw")
+
+
+
+
+
+
+```
+
+```{r}
+
+k = 10
+
+dailyTrainModel$CONTRACT_KEY <- sample(1:k, nrow(dailyTrainModel), replace = TRUE)
+list <- c(1:k)
+
+RF2prediction <- data.frame()
+RF2testsetCopy <- data.frame()
+
+for (i in 1:k) {
+  RF2trainingset <- subset(dailyTrainModel, CONTRACT_KEY %in% list[-i])
+  RF2testset <- subset(dailyTrainModel, CONTRACT_KEY %in% c(i))
+  RF2model <- svm(RF2trainingset$TARGET ~ ., data = RF2trainingset)
+  RF2temp <- as.data.frame(predict(RF2model, newdata = RF2testset, type = "class"))
+  RF2prediction <- rbind(RF2prediction, RF2temp)
+  RF2testsetCopy <- rbind(RF2testsetCopy,RF2testset)
+  }
+
+
+
+
+kFoldModel <- as.factor(RF2prediction$`predict(RF2model, newdata = RF2testset, type = "class")`)
+RF2CM <- table(kFoldModel, RF2testsetCopy$X2)
+RF2precision <- RF2CM[1,1]/sum(RF2CM[1:2,1])
+RF2recall <- RF2CM[1,1]/sum(RF2CM[1,1:2])
+RF2FScore <- 2*RF2precision*RF2recall/(RF2precision + RF2recall)
+RF2accuracy <- sum(RF2CM[1,1], RF2CM[2,2])/sum(RF2CM[,])
+RF2error <- 1 - RF2accuracy
+confusionMatrix(RF2CM)
+```
+
+
+```{r}
+
+
+
+
+folds <- kfold(dailyTrainModel, k=10 )
+prediction <- data.frame()
+testset <- data.frame()
+for(i in 1:10){
+  test <- dailyTrainModel[folds==i,]
+  train <- dailyTrainModel[folds!=i,]
+  model <- randomForest(TARGET~., data= dailyTrainModel, trials=10)
+  testset<- rbind(test, as.data.frame(test) )
+  predictedFold <- data.frame(predict(model, test))
+}
+
+
+newTest<- dplyr::right_join(contract_ref, test, by = "CONTRACT_KEY")
+
+newTest <- dplyr::select(newTest, -c(X206_SESSION_COUNT, X206_USAGE, X207_USAGE, X208_SESSION_COUNT, X209_USAGE, X209_SESSION_COUNT, X210_USAGE, X210_SESSION_COUNT, GENDER, VALUE_SEGMENT, X207_SESSION_COUNT, X208_USAGE, HANDSET_NAME))
+folds <- kfold(dailyTrainModel, k=10 )
+prediction <- data.frame()
+testset <- data.frame()
+for(i in 1:10){
+  test <- dailyTrainModel[folds==i,]
+  train <- dailyTrainModel[folds!=i,]
+  model <- svm(as.factor(TARGET)~., data= train)
+
+  testset<- rbind(test, as.data.frame(test) )
+  predictedFold <- data.frame(predict(model, test))
+}
+```
