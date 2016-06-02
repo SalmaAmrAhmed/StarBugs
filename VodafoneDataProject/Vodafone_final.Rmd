@@ -1,0 +1,389 @@
+---
+Title: "Vodafone_final"
+Author: "Salma Amr, Mayar ElMohr"
+Date: "June 2, 2016"
+Output: html_document
+---
+
+This Markdown explores 5 months data usage in Mega Bytes for 100K of Vodafone customers, subscribed to one of its rate plans. Our task is to predict whether a customer will exceed their average usage over the 5 months by 500 Mega Bytes in the coming month.
+
+###Important to mention:
+1. All the following models were trained using "neural network"" algorithm as it gave us the best performance compared to "randomForests", "rpart", "SVM", "naivebayes" and "logistic regression".
+
+2. All models' performance was evaluated by calculating the auc using "pRoc" R package, and cross validations.
+
+3. Our approach was to produce many different models trained based on different attributes (splitting and joining the datasets accordingly) thus; having different submission files ensembling all files together at the end to get the highest accuracy- following this guide [link](http://mlwave.com/kaggle-ensembling-guide/): 
+
+First let's load all **required libraries**:
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(chron)
+library(stringi)
+library(knitr)
+library(C50)
+library(printr)
+library(rpart)
+library(lattice)
+library(adabag)
+library(mice)
+library(VIM)
+library(missForest)
+library(Boruta)
+library(plyr)
+library(DMwR)
+library(RWeka)
+library(pROC)
+```
+
+We started with loading the data:
+
+```{r, cache=TRUE}
+
+contract_ref <- read.csv("contract_ref.csv")
+daily_aggregate <- read.csv("daily_aggregate.csv")
+roaming_monthly <- read.csv("roaming_monthly.csv")
+calendar_ref <- read.csv("calendar_ref.csv")
+test <- read.csv("test.csv")
+train <- read.csv("train.csv")
+```
+
+then, started **data exploration**, **cleaning** and **preparation**
+
+###Variable Identification:
+Identify Predictor (Input) and Target (Output) variables. Next, identify the data type and category of the variables.
+
+```{r, cache=TRUE}
+train %>% str()
+contract_ref %>% str()
+calendar_ref %>% str()
+roaming_monthly %>% str()
+daily_aggregate %>% str()
+test %>% str()
+```
+
+////image of data identification:
+![](////path)
+
+###Missing Values Treatment:
+
+First we inspect and plot the missing data in table **contract_ref**:
+
+####1. VALUE_SEGMENT
+
+```{r, cache=TRUE}
+contract_ref$VALUE_SEGMENT[contract_ref$VALUE_SEGMENT == "N/A"] <- NA
+md.pattern(contract_ref)
+mice_plot <- aggr(contract_ref, col=c('darkolivegreen3','deepskyblue1'), alpha = 0.4, numbers=TRUE, border = FALSE, sortVars=TRUE, labels=names(contract_ref), cex.axis=.5, gap=2, ylab=c("Missing data","Pattern"))
+marginplot(contract_ref[, c("AGE", "VALUE_SEGMENT")], col = c('darkolivegreen3','deepskyblue1'), delimiter = NULL, cex.numbers = 1.2, pch = 19, frame.plot = FALSE)
+```
+
+Imputing the NA's of the VALUE_SEGMENT in table contract_ref, using KNN Imputation where the missing values of an attribute are imputed using the given number of attributes that are most similar to the attribute whose values are missing:
+
+```{r, cache=TRUE}
+contract_ref_imputed <- knnImputation(contract_ref)
+```
+
+then, Value segments of 'Med-Low' and 'Med-High' were both combined to a 'Medium' value segment 
+
+```{r}
+levels(contract_ref_imputed$VALUE_SEGMENT)[contract_ref_imputed$VALUE_SEGMENT == "Med-High"] = "Medium"
+levels(contract_ref_imputed$VALUE_SEGMENT)[contract_ref_imputed$VALUE_SEGMENT == "Med-Low"] = "Medium"
+contract_ref_imputed$VALUE_SEGMENT[contract_ref_imputed$VALUE_SEGMENT == "Med-High"] = "Medium"
+contract_ref_imputed$VALUE_SEGMENT[contract_ref_imputed$VALUE_SEGMENT == "Med-Low"] = "Medium"
+
+```                 
+
+
+
+####2.GENDER
+
+First we change the gender values to Male, Female, Not enetered, instead of having f, F, m, M, Unknown.
+
+Below is a graph for gender compered to target //// 
+
+```{r}
+levels(contract_ref_imputed$GENDER)[levels(contract_ref_imputed$GENDER) == "F"] <- "Female"
+levels(contract_ref_imputed$GENDER)[levels(contract_ref_imputed$GENDER) == "f"] <- "Female"
+levels(contract_ref_imputed$GENDER)[levels(contract_ref_imputed$GENDER) == "m"] <- "Male"
+levels(contract_ref_imputed$GENDER)[levels(contract_ref_imputed$GENDER) == "M"] <- "Male"
+levels(contract_ref_imputed$GENDER)[levels(contract_ref_imputed$GENDER) == "Unknown"] <- "Not Entered"
+```
+
+
+####3. AGE
+The age has some -ve values where we assumed its a wrong entery, and a alot of 99 values, which corresponds to the gender of Not Entered where we assumed that all the 99 values are NA's.
+
+We performed Mean Imputation according to the corresponding value segment, where we grouped the age into two groups
+
+1- Group with age < 16, where it's illegal to sign a contract from a Telcom agency
+
+2- Group with age = 99
+
+
+```{r}
+
+contract_ref_filtered = filter(contract_ref_imputed, as.numeric(contract_ref_imputed$AGE) >= 16)
+contract_ref_filtered = filter(contract_ref_imputed, as.numeric(contract_ref_imputed$AGE) <= 95)
+
+
+contract_ref_unfiltered = anti_join(contract_ref_imputed, contract_ref_filtered, by = "CONTRACT_KEY")
+
+
+age_of_Core_Segment <- data.frame( contract_ref_filtered$AGE[contract_ref_filtered$VALUE_SEGMENT == 'Core'])
+ggplot() + geom_bar(data = age_of_Core_Segment, aes(x=age_of_Core_Segment$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....))  + ggtitle("Age of Core Value segment") + xlab("Age")
+
+mean_core <- mean(as.numeric(age_of_Core_Segment$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....), na.rm= TRUE)
+
+age_of_Med_low <- data.frame( contract_ref_filtered$AGE[contract_ref_filtered$VALUE_SEGMENT == 'Med-Low']) 
+ggplot() + geom_bar(data = age_of_Med_low, aes(x=age_of_Med_low$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....)) + ggtitle("Age of Med Low Value segment") + xlab("Age") 
+
+
+mean_med_low <- mean(as.numeric(age_of_Med_low$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....), na.rm= TRUE)
+
+age_of_High_Segment <- data.frame( contract_ref_filtered$AGE[contract_ref_filtered$VALUE_SEGMENT == 'High'])
+ggplot() + geom_bar(data = age_of_High_Segment, aes(x=age_of_High_Segment$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....))  + ggtitle("Age of High Value segment") + xlab("Age")
+
+
+mean_high <- mean(as.numeric(age_of_High_Segment$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....), na.rm= TRUE)
+
+age_of_Med_High_Segment <- data.frame( contract_ref_filtered$AGE[contract_ref_filtered$VALUE_SEGMENT == 'Med-High'])
+ggplot() + geom_bar(data = age_of_Med_High_Segment, aes(x=age_of_Med_High_Segment$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....))  + ggtitle("Age of Mid-High Value segment") + xlab("Age")
+mean_med_high <- mean(as.numeric(age_of_Med_High_Segment$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....), na.rm= TRUE)
+
+
+age_of_premium <- data.frame( contract_ref_filtered$AGE[contract_ref_filtered$VALUE_SEGMENT == 'Premium'])
+ggplot() + geom_bar(data = age_of_premium, aes(x=age_of_premium$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....))  + ggtitle("Age of premium Value segment") + xlab("Age")
+mean_premium <- mean(as.numeric(age_of_premium$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....), na.rm= TRUE)
+
+
+
+age_of_platinum <- data.frame( contract_ref_filtered$AGE[contract_ref_filtered$VALUE_SEGMENT == 'Platinum'])
+ggplot() + geom_bar(data = age_of_platinum, aes(x=age_of_platinum$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....))  + ggtitle("Age of platinum Value segment") + xlab("Age")
+mean_platinum <- mean(as.numeric(age_of_platinum$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....), na.rm = TRUE)
+
+contract_ref_unfiltered$AGE[contract_ref_unfiltered$VALUE_SEGMENT ==as.character("Core") ] = as.integer(mean_core)
+contract_ref_unfiltered$AGE[contract_ref_unfiltered$VALUE_SEGMENT ==as.character("High") ] = as.integer(mean_high)
+contract_ref_unfiltered$AGE[contract_ref_unfiltered$VALUE_SEGMENT ==as.character("Med-Low") ] = as.integer(mean_med_low)
+contract_ref_unfiltered$AGE[contract_ref_unfiltered$VALUE_SEGMENT ==as.character("Med-High") ] = as.integer(mean_med_high)
+contract_ref_unfiltered$AGE[contract_ref_unfiltered$VALUE_SEGMENT ==as.character("Premium") ] = as.integer(mean_premium)
+contract_ref_unfiltered$AGE[contract_ref_unfiltered$VALUE_SEGMENT ==as.character("Platinum") ] = as.integer(mean_platinum)
+
+
+
+contract_ref_new = bind_rows(contract_ref_unfiltered, contract_ref_filtered)
+
+
+```
+
+
+####4.HANDSET NAME
+
+Handset names were grouped by types to reduce their levels according to the brand where we assumed that the handset would affect the consumption especially the internet usage.
+We googled and researched the mobiles of unfamilar brands to group them together, also we figured that some of the handsets resembled companies and agencies thus we grouped them together to a new level called "Agency"
+
+They were clustered into //// levels
+Below is a graph //// code here there 
+
+```{r}
+
+contract_ref_new$HANDSET_NAME <- sub(".*Samsung.*", "Samsung", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Sony.*", "Sony", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Apple.*", "Apple", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*GoogleNexus.*", "GoogleNexus", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*BlackBerry.*", "BlackBerry", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Asus.*", "Asus", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Vodafone.*", "Vodafone", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*HTC.*", "HTC", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Lenovo.*", "Lenovo", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Simcom.*", "Simcom", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Microsoft.*", "Microsoft", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Huawei.*", "Huawei", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Alcatel.*", "Alcatel", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Nokia.*", "Nokia", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Sico.*", "Sico", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Beryl.*", "Beryl", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*TP-Link.*", "TP-Link", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Fibocom.*", "Fibocom", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Verifone.*", "Verifone", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Cinterion.*", "Cinterion", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Siemens.*", "Siemens", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*G-tide.*", "G-tide", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Cisco.*", "Cisco", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Quectel.*", "QuectelWirelessSolutions", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Assure.*", "Assure", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Arab.*", "Agency", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*tele.*", "Agency", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Tele.*", "Agency", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*ZTE.*", "ZTE", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*ACER.*", "ACER", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Ace.*", "Agency", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*ZTS.*", "Agency", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*ZTC.*", "ZTC", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Express.*", "Agency", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Technology.*", "Agency", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*technology.*", "Agency", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*tech.*", "Agency", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*tec.*", "Agency", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Xiaomi.*", "Agency", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Wiko.*", "Wiko", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Souq.*", "Agency", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Sierra.*", "Agency", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Motorola.*", "Motorola", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Hisense.*", "Agency", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Trading.*", "Agency", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Telit.*", "Agency", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Lulu.*", "Lulu", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*LG.*", "LG", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*HP.*", "HP", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Group.*", "Group", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Goldgoal.*", "Agency", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Goldgoal .*", "Agency", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".* Goldgoal .*", "Agency", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Import.*", "Agency", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*ARCHOS.*", "ARCHOS", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".* Coolpad.*", " Coolpad", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Oppo.*", "Oppo", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Sharp.*", "Sharp", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Panasonic.*", "Panasonic", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".* BLU.*", "BLU", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*BLU.*", "BLU", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Infinix.*", "Infinix", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Shenzhen.*", "Shenzhen", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Teltonika.*", "Teltonika", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Sagem.*", "Agency", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*Fly Mobiles.*", "Fly Mobiles", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*K-Touch.*", "K-Touch", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- sub(".*OnePlus.*", "OnePlus", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
+contract_ref_new$HANDSET_NAME <- as.factor(contract_ref_new$HANDSET_NAME)
+
+```
+
+
+Next, we inspect and plot the **daily_aggregate** to get some sights about the ROAMING and LOCAL:
+Having all the roaming and local usage and number of sessions prepared in extrernal .csv file, we load them directly, then join the tables accordingly:
+
+///fill the join code, add the .csv submission files 
+
+
+```{r}
+local_consumption <- read.csv("local_consumption.csv")
+roaming_consumption <- read.csv("roaming_consumption.csv")
+local_sessions_count <- read.csv("local_sessions_count.csv")
+roaming_sessions_count <- read.csv("roaming_sessions_count.csv")
+
+
+
+
+```
+
+
+Having the AGE, ROAMING & LOCAL CONSUMPTION, GENDER prepared, we train the datasets producing different models and different submission files:
+
+
+//Load code and submission files
+
+```{r}
+
+```
+
+
+Next, we inspect and plot the **calendar_ref** and join it with the daily_aggregate dataset.
+Having the .csv file which has the data prepared and joined together, then we'll proceed on calculating for each user the total consumption on week days and non-week days, then change it to Mega bytes, finally we train our model and calculate the are under curve and produce a submission file:
+
+////add the csv submission file and the needed plots
+
+```{r}
+week_flag <- read.csv("week_flag.csv")
+week_flag1 = mutate(week_flag, TOTAL_MEG_CONSUMPTION = as.integer(week_flag$TOTAL_CONSUMPTION/(1024*1024)))
+week_flag1 <- dplyr::select(week_flag1, -c(CALL_DATE_KEY, MONTH_KEY, CELL_KEY, MONTH_NAME, FULL_DATE, DAY_NAME, TOTAL_CONSUMPTION))
+weekDay = filter(week_flag1, WEEKDAY_FLAG == "Y")
+weekEnd = filter(week_flag1, WEEKDAY_FLAG == "N")
+weekDay1 =aggregate(weekDay$TOTAL_MEG_CONSUMPTION,by=weekDay['CONTRACT_KEY'],FUN=sum)
+weekDay<- weekDay   %>% right_join(weekDay1, by = "CONTRACT_KEY")
+colnames(weekDay)[6] <- "WEEK_DAY_CONSUMPTION"
+weekDay1 =aggregate(weekDay$NO_OF_SESSIONS,by=weekDay['CONTRACT_KEY'],FUN=sum)
+weekDay<- weekDay   %>% right_join(weekDay1, by = "CONTRACT_KEY")
+colnames(weekDay)[7] <- "WEEK_DAY_SESSIONS"
+weekEnd1 =aggregate(weekEnd$TOTAL_MEG_CONSUMPTION,by=weekEnd['CONTRACT_KEY'],FUN=sum)
+weekEnd<- weekEnd   %>% right_join(weekEnd1, by = "CONTRACT_KEY")
+colnames(weekEnd)[6] <- "WEEK_END_CONSUMPTION"
+weekEnd1 =aggregate(weekEnd$NO_OF_SESSIONS,by=weekEnd['CONTRACT_KEY'],FUN=sum)
+weekEnd<- weekEnd   %>% right_join(weekEnd1, by = "CONTRACT_KEY")
+colnames(weekEnd)[7] <- "WEEK_END_SESSIONS"
+weeks = rbind(weekDay, weekEnd)
+weekends <- dplyr::select(weekends, -c(NO_OF_SESSIONS, ROAMING_FLAG,WEEKDAY_FLAG, TOTAL_MEG_CONSUMPTION ))
+weekends <- distinct(weekends)
+weekDay <- dplyr::select(weekDay, -c(NO_OF_SESSIONS, ROAMING_FLAG,WEEKDAY_FLAG, TOTAL_MEG_CONSUMPTION ))
+weekDay <- distinct(weekDay)
+train_week <- left_join(train2, weekDay, BY = "CONTRACT_KEY")
+train_week <- left_join(train_week, weekends, BY = "CONTRACT_KEY")
+train_week$WEEK_DAY_SESSIONS[is.na(train_week$WEEK_DAY_SESSIONS)] = 0
+train_week$WEEK_DAY_CONSUMPTION[is.na(train_week$WEEK_DAY_CONSUMPTION)] = 0
+train_week$WEEK_END_SESSIONS[is.na(train_week$WEEK_END_SESSIONS)] = 0
+train_week$WEEK_END_CONSUMPTION[is.na(train_week$WEEK_END_CONSUMPTION)] = 0
+#train_week$X210_USAGE = as.numeric(train_week$X210_USAGE) - as.numeric(train_week$WEEK_DAY_CONSUMPTION)
+#train_week$X210_SESSION_COUNT <- train_week$X210_SESSION_COUNT - train_week$WEEK_DAY_SESSIONS
+#train_week <- dplyr::select(train_week, -c(WEEK_DAY_CONSUMPTION, WEEK_DAY_SESSIONS))
+train_week <- train_week[c(1,2,3,4,5,6,9,8,10,12,11,7)]
+write.csv(train_week, "tra_week.csv", row.names = FALSE)
+model <- nn(as.factor(TARGET)~. -CONTRACT_KEY, data= train_week)
+predictedFold <- data.frame(predict(model,  train_week[1:11], type = "class"))
+auc(as.numeric(train_week$TARGET), as.numeric(predictedFold$predict.model..train_week.1.11...type....class..))
+```
+
+
+###Feature Engineering:
+
+Let's join the "train" and our newly imputed "contract_ref_new" datasets:
+
+```{r}
+train_contract_ref <- inner_join(train, contract_ref_new, BY="CONTRACT_KEY")
+```
+
+
+####1.Feature Selection
+
+We used Boruta Package in R as it works as a wrapper algorithm around Random Forest besides Azzure feature selection module to figure out the most important features that could contribute boosting the accuracy and the score of the model. Thus; it shows the relation between the attributes and excludes the highly correlated features.
+
+
+```{r}
+
+boruta.train <- Boruta(TARGET~.-CONTRACT_KEY, data = train_contract_ref, doTrace = 2)
+plot(boruta.train, xlab = "", xaxt = "n")
+lz<-lapply(1:ncol(boruta.train$ImpHistory),function(i)
+boruta.train$ImpHistory[is.finite(boruta.train$ImpHistory[,i]),i])
+names(lz) <- colnames(boruta.train$ImpHistory)
+Labels <- sort(sapply(lz,median))
+axis(side = 1,las=2,labels = names(Labels),
+at = 1:ncol(boruta.train$ImpHistory), cex.axis = 0.7)
+
+```
+
+Applying the feature selection, It's obvious that the "TOTAL_CONSUMPTION" and the "X210_USAGE" contributes with a high score accuracy, thus; let's have our model trained producing submission files.
+
+//Load the code and submission files
+```{r}
+
+```
+
+Then, we permute over each month, and subtract three months consumption from the total consumption, excluding the consumption of the last month plus and one of the other permuted month each time to produce 4 different submission files from each trained model.
+
+//Load the code and submission files
+```{r}
+
+```
+
+
+###Model ensembling:
+
+Where we created ensembles from all the previous submission files, using the "Kaggle_avg.py" script [link](https://github.com/MLWave/Kaggle-Ensemble-Guide/blob/master/kaggle_avg.py).
+
+//Image shows how each submission file contributed in our final submission
+
+
+
+                           
+                           
