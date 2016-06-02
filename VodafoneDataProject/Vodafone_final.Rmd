@@ -279,7 +279,7 @@ contract_ref_new$HANDSET_NAME <- as.factor(contract_ref_new$HANDSET_NAME)
 Next, we inspect and plot the **daily_aggregate** to get some sights about the ROAMING and LOCAL:
 Having all the roaming and local usage and number of sessions prepared in extrernal .csv file, we load them directly, then join the tables accordingly:
 
-///fill the join code, add the .csv submission files 
+///fill the join code
 
 
 ```{r}
@@ -304,10 +304,13 @@ ALL                                                        | sub_roaming_train.c
 ALL except LOCAL, ROAMING sessions count                   | sub_roaming_train-session.csv         | 0.6744
 ALL except LOCAL, ROAMING sessions count & ROAMING_USAGE   | sub_roaming_train-session-roaming.csv | 0.6629
 BASE SET WITH NO ROAMING NOR LOCAL                         | sub_original_train.csv                | 0.667
-ALL with AGE
-ALL with GENDER
-ALL with VALUE_SEGMENT
-ALL with HANDSET
+ALL with AGE                                               | sub_age.csv                           |
+ALL with GENDER                                            | sub_gender.csv                        |
+ALL with VALUE_SEGMENT                                     | sub_valuesegment.csv                  |
+ALL with AGE, GENDER                                       | sub_age_gender.csv                    |
+ALL with AGE, GENDER, VALUE_SEGMENT                        | sub_age_gender_valuesegment.csv       |
+ALL with HANDSET                                           | sub_handset.csv                       |
+ALL with AGE, GENDER, VALUE_SEGMENT, HANDSET_NAME          | sub_all.csv                           |
 
 //Load code
 
@@ -323,7 +326,7 @@ ALL with HANDSET
 
 
 Next, we inspect and plot the **calendar_ref** and join it with the daily_aggregate dataset.
-Having the .csv file which has the data prepared and joined together, then we'll proceed on calculating for each user the total consumption on week days and non-week days, then change it to Mega bytes, finally we train our model and calculate the are under curve and produce a submission file:
+Having the .csv file which has the data prepared and joined together, then we'll proceed on calculating for each user the total consumption on week days and non-week days, then change it to Mega bytes, finally we train our model and calculate the auc and produce a submission file:
 
 ////add the csv submission file and the needed plots
 
@@ -363,6 +366,12 @@ predictedFold <- data.frame(predict(model,  train_week[1:11], type = "class"))
 auc(as.numeric(train_week$TARGET), as.numeric(predictedFold$predict.model..train_week.1.11...type....class..))
 ```
 
+Model Attributes                                           | Submission File Name                  | Accuracy
+-----------------------------------------------------------| --------------------------------------| --------
+ALL, WEEKEND_CONSUMPTION, WEEKDAY_CONSUMPTION, ROAMUNG     | sub_weekend_weekday.csv               | 
+
+
+
 
 ###Feature Engineering:
 
@@ -393,27 +402,39 @@ at = 1:ncol(boruta.train$ImpHistory), cex.axis = 0.7)
 
 Applying the feature selection, It's obvious that the "TOTAL_CONSUMPTION" and the "X210_USAGE" contributes with a high score accuracy, thus; let's train our model against those two attributes permuting over the rest of the months usage.
 
+//Load the feature selection photos:
+```{r}
+
+```
+
+We permute over each month, and subtract three months consumption from the total consumption, excluding the consumption of the last month plus one of the other permuted month each time to produce 4 different submission files from each trained model. Below each submission file produced from a trained model and it's accuracy.
+
 //Load the code and submission files
 ```{r}
 
 ```
 
-Then, we permute over each month, and subtract three months consumption from the total consumption, excluding the consumption of the last month plus and one of the other permuted month each time to produce 4 different submission files from each trained model.
-
-//Load the code and submission files
-```{r}
-
-```
+Model Attributes                                           | Submission File Name                  | Accuracy
+-----------------------------------------------------------| --------------------------------------| --------
+ALL, X206, X210                                            | sub_X206_X210.csv                     | 0.6609
+ALL, X207, X210                                            | sub_X207_X210.csv                     | 0.6673
+ALL, X208, X210                                            | sub_X208_X210.csv                     | 0.6717
+ALL, X209, X210                                            | sub_X209_X210.csv                     | 0.6767
 
 
 ###Model ensembling:
 
 Where we created ensembles from all the previous submission files, using the "Kaggle_avg.py" script [link](https://github.com/MLWave/Kaggle-Ensemble-Guide/blob/master/kaggle_avg.py).
 
-//Image shows how each submission file contributed in our final submission
+//Image shows how each submission file contributed in our final submission after applying ensembling over all files.
 
 
 #####KFold Cross Validations:
+
+```{r}
+
+```
+
 
 
 
