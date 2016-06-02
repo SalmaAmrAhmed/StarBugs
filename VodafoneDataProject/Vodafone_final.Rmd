@@ -64,8 +64,7 @@ daily_aggregate %>% str()
 test %>% str()
 ```
 
-////image of data identification:
-![](////path)
+![](variables.png)
 
 ###Missing Values Treatment:
 
@@ -102,8 +101,6 @@ contract_ref_imputed$VALUE_SEGMENT[contract_ref_imputed$VALUE_SEGMENT == "Med-Lo
 
 First we change the gender values to Male, Female, Not enetered, instead of having f, F, m, M, Unknown.
 
-Below is a graph for gender compered to target //// 
-
 ```{r}
 levels(contract_ref_imputed$GENDER)[levels(contract_ref_imputed$GENDER) == "F"] <- "Female"
 levels(contract_ref_imputed$GENDER)[levels(contract_ref_imputed$GENDER) == "f"] <- "Female"
@@ -112,9 +109,26 @@ levels(contract_ref_imputed$GENDER)[levels(contract_ref_imputed$GENDER) == "M"] 
 levels(contract_ref_imputed$GENDER)[levels(contract_ref_imputed$GENDER) == "Unknown"] <- "Not Entered"
 ```
 
+Proceed plotting the GENDER distribution:
+
+```{r}
+train_contract_ref_imputed <- inner_join(train, contract_ref_imputed, BY = "CONTRACT_KEY")
+
+
+ggplot() + geom_histogram(data = train_contract_ref_imputed, aes(x=as.numeric(rp.hours), y=..density..), colour = "gray", fill = "white", binwidth = 2)  + geom_density(data = filteredColumns, aes(x = as.numeric(rp.hours)), alpha = .2, fill = "magenta") + ggtitle("Total number of reports Vs rush hours")
+
+
+
+qplot(TARGET, data=train_contract_ref_imputed, fill=GENDER, geom="bar")
+qplot(GENDER, data=train_contract_ref_imputed, fill=factor(TARGET))
+
+```
+
+
+
 
 ####3. AGE
-The age has some -ve values where we assumed its a wrong entery, and a alot of 99 values, which corresponds to the gender of Not Entered where we assumed that all the 99 values are NA's.
+The age has some -ve values where we assumed its a wrong entry, and a alot of 99 values, which corresponds to the gender of Not Entered where we assumed that all the 99 values are NA's.
 
 We performed Mean Imputation according to the corresponding value segment, where we grouped the age into two groups
 
@@ -280,12 +294,30 @@ roaming_sessions_count <- read.csv("roaming_sessions_count.csv")
 ```
 
 
-Having the AGE, ROAMING & LOCAL CONSUMPTION, GENDER prepared, we train the datasets producing different models and different submission files:
+Having the ROAMING_CONSUMPTION, LOCAL_CONSUMPTION prepared beside the previously prepared dataset attributes, we train the datasets having different models and different submission files:
 
+All models trained using neural networks, below each submission file and it's corresponding model calculated auc score:
 
-//Load code and submission files
+Model Attributes                                           | Submission File Name                  | Accuracy
+-----------------------------------------------------------| --------------------------------------| --------
+ALL                                                        | sub_roaming_train.csv                 | 0.6767
+ALL except LOCAL, ROAMING sessions count                   | sub_roaming_train-session.csv         | 0.6744
+ALL except LOCAL, ROAMING sessions count & ROAMING_USAGE   | sub_roaming_train-session-roaming.csv | 0.6629
+BASE SET WITH NO ROAMING NOR LOCAL                         | sub_original_train.csv                | 0.667
+ALL with AGE
+ALL with GENDER
+ALL with VALUE_SEGMENT
+ALL with HANDSET
+
+//Load code
 
 ```{r}
+
+
+
+
+
+
 
 ```
 
@@ -324,9 +356,6 @@ train_week$WEEK_DAY_SESSIONS[is.na(train_week$WEEK_DAY_SESSIONS)] = 0
 train_week$WEEK_DAY_CONSUMPTION[is.na(train_week$WEEK_DAY_CONSUMPTION)] = 0
 train_week$WEEK_END_SESSIONS[is.na(train_week$WEEK_END_SESSIONS)] = 0
 train_week$WEEK_END_CONSUMPTION[is.na(train_week$WEEK_END_CONSUMPTION)] = 0
-#train_week$X210_USAGE = as.numeric(train_week$X210_USAGE) - as.numeric(train_week$WEEK_DAY_CONSUMPTION)
-#train_week$X210_SESSION_COUNT <- train_week$X210_SESSION_COUNT - train_week$WEEK_DAY_SESSIONS
-#train_week <- dplyr::select(train_week, -c(WEEK_DAY_CONSUMPTION, WEEK_DAY_SESSIONS))
 train_week <- train_week[c(1,2,3,4,5,6,9,8,10,12,11,7)]
 write.csv(train_week, "tra_week.csv", row.names = FALSE)
 model <- nn(as.factor(TARGET)~. -CONTRACT_KEY, data= train_week)
@@ -362,7 +391,7 @@ at = 1:ncol(boruta.train$ImpHistory), cex.axis = 0.7)
 
 ```
 
-Applying the feature selection, It's obvious that the "TOTAL_CONSUMPTION" and the "X210_USAGE" contributes with a high score accuracy, thus; let's have our model trained producing submission files.
+Applying the feature selection, It's obvious that the "TOTAL_CONSUMPTION" and the "X210_USAGE" contributes with a high score accuracy, thus; let's train our model against those two attributes permuting over the rest of the months usage.
 
 //Load the code and submission files
 ```{r}
@@ -382,6 +411,9 @@ Then, we permute over each month, and subtract three months consumption from the
 Where we created ensembles from all the previous submission files, using the "Kaggle_avg.py" script [link](https://github.com/MLWave/Kaggle-Ensemble-Guide/blob/master/kaggle_avg.py).
 
 //Image shows how each submission file contributed in our final submission
+
+
+#####KFold Cross Validations:
 
 
 
