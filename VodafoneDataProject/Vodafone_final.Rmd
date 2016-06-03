@@ -1,8 +1,9 @@
 ---
-Title: "Vodafone_final"
-Author: "Salma Amr, Mayar ElMohr"
-Date: "June 2, 2016"
+Author: Salma Amr, Mayar ElMohr
+Date: June 2, 2016
 Output: html_document
+Title: Vodafone_final
+output: html_document
 ---
 
 This Markdown explores 5 months data usage in Mega Bytes for 100K of Vodafone customers, subscribed to one of its rate plans. Our task is to predict whether a customer will exceed their average usage over the 5 months by 500 Mega Bytes in the coming month.
@@ -16,26 +17,28 @@ This Markdown explores 5 months data usage in Mega Bytes for 100K of Vodafone cu
 
 First let's load all **required libraries**:
 
-```{r}
-library(dplyr)
-library(tidyr)
-library(ggplot2)
-library(chron)
-library(stringi)
-library(knitr)
-library(C50)
-library(printr)
-library(rpart)
-library(lattice)
-library(adabag)
-library(mice)
-library(VIM)
-library(missForest)
-library(Boruta)
-library(plyr)
-library(DMwR)
-library(RWeka)
-library(pROC)
+```{r, cache=TRUE}
+
+
+library("dplyr")
+library("ggplot2")
+library('randomForest')
+library('rpart')
+library('dismo')
+library('randomForest')
+library('e1071')
+library('adabag')
+library('caret')
+library('ipred')
+library('C50')
+library('stringi')
+library('pROC')
+library('nnet')
+library('RWeka')
+library('Boruta')
+library('VIM')
+library('DMwR')
+library('mice')
 library(gridExtra)
 
 ```
@@ -44,12 +47,12 @@ We started with loading the data:
 
 ```{r, cache=TRUE}
 
-contract_ref <- read.csv("contract_ref.csv")
-daily_aggregate <- read.csv("daily_aggregate.csv")
-roaming_monthly <- read.csv("roaming_monthly.csv")
-calendar_ref <- read.csv("calendar_ref.csv")
-test <- read.csv("test.csv")
-train <- read.csv("train.csv")
+contract_ref <- read.csv("/Users/mayarelmohr/Documents/Semester10/DataScience/Vodafone2/StarBugs/VodafoneDataProject/contract_ref.csv")
+daily_aggregate <- read.csv("/Users/mayarelmohr/Documents/Semester10/DataScience/Vodafone2/StarBugs/VodafoneDataProject/daily_aggregate.csv")
+roaming_monthly <- read.csv("/Users/mayarelmohr/Documents/Semester10/DataScience/Vodafone2/StarBugs/VodafoneDataProject/roaming_monthly.csv")
+calendar_ref <- read.csv("/Users/mayarelmohr/Documents/Semester10/DataScience/Vodafone2/StarBugs/VodafoneDataProject/calendar_ref.csv")
+test <- read.csv("/Users/mayarelmohr/Documents/Semester10/DataScience/Vodafone2/StarBugs/VodafoneDataProject/test.csv")
+train <- read.csv("/Users/mayarelmohr/Documents/Semester10/DataScience/Vodafone2/StarBugs/VodafoneDataProject/train.csv")
 ```
 
 then, started **data exploration**, **cleaning** and **preparation**
@@ -144,7 +147,8 @@ p1 <- ggplot() + geom_bar(data = age_of_Core_Segment, aes(x=age_of_Core_Segment$
 mean_core <- mean(as.numeric(age_of_Core_Segment$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....), na.rm= TRUE)
 
 age_of_Med_low <- data.frame( contract_ref_filtered$AGE[contract_ref_filtered$VALUE_SEGMENT == 'Med-Low']) 
-p2 <-  geom_bar(data = age_of_Med_low, aes(x=age_of_Med_low$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....), fill = "deepskyblue1 ", alpha = 0.4 ) + ggtitle("Age of Med Low Value segment") + xlab("Age") 
+p2 <-ggplot()+  geom_histogram(data = age_of_Med_low, aes(x=age_of_Med_low$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....), fill = "deepskyblue1") + ggtitle("Age of Med Low Value segment") + xlab("Age") 
+
 
 
 mean_med_low <- mean(as.numeric(age_of_Med_low$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....), na.rm= TRUE)
@@ -196,7 +200,7 @@ contract_ref_new$VALUE_SEGMENT[contract_ref_new$VALUE_SEGMENT == "Med-Low"] = "M
 
 Below is a graph for age distribution within each value segment
 
-```{r cache = true}
+```{r, cache=TRUE}
 
 grid.arrange(p1,p2,p3,p4,p5,p6, ncol = 2, nrow = 3)
 ```
@@ -293,7 +297,9 @@ contract_ref_new$HANDSET_NAME <- as.factor(contract_ref_new$HANDSET_NAME)
 ```
 
 After doing, some feature engineering, we created a new instance of traing set that has the usage and session counts of the last two month, in addition to the total of usage and sessions of the first three months, with AUC score = 0.667
-```{r}
+
+```{r, cache=TRUE}
+
 
 train_9_10 <- train
 
@@ -317,7 +323,9 @@ Having all the roaming and local usage and number of sessions prepared in extrer
 
 
 
-```{r}
+```{r, cache=TRUE}
+
+
 local_consumption <- read.csv("local_consumption.csv")
 roaming_consumption <- read.csv("roaming_consumption.csv")
 local_sessions_count <- read.csv("local_sessions_count.csv")
@@ -329,19 +337,31 @@ Here, we add the roaming and local consumption of the last two months to the new
 
 ```{r}
 
+train_roaming <- dplyr::left_join(train_9_10, local_sessions_count, BY = "CONTRACT_KEY")
+train_roaming <- dplyr::left_join(train_roaming, local_consumption, BY = "CONTRACT_KEY")
+train_roaming <- dplyr::left_join(train_roaming, roaming_consumption, BY = "CONTRACT_KEY")
 
-train_roaming <- left_join(train_9_10, local_sessions_count, BY = "CONTRACT_KEY")
-train_roaming <- left_join(train_roaming, local_consumption, BY = "CONTRACT_KEY")
-train_roaming <- left_join(train_roaming, roaming_consumption, BY = "CONTRACT_KEY")
-train_roaming <- left_join(train_roaming, roaming_sessions_count, BY = "CONTRACT_KEY")
+train_roaming <- dplyr::left_join(train_roaming, roaming_sessions_count, BY = "CONTRACT_KEY")
+#levels(train_roaming$ROAMING_USAGE)[is.na(train_roaming$ROAMING_USAGE)] = 0
 train_roaming$ROAMING_USAGE[is.na(train_roaming$ROAMING_USAGE)] = 0
+#levels(train_roaming$LOCAL_USAGE)[is.na(train_roaming$LOCAL_USAGE)] = 0
 train_roaming$LOCAL_USAGE[is.na(train_roaming$LOCAL_USAGE)] = 0
+#levels(train_roaming$LOCAL_SESSIONS_COUNT)[is.na(train_roaming$LOCAL_SESSIONS_COUNT)] = 0
 train_roaming$LOCAL_SESSIONS_COUNT[is.na(train_roaming$LOCAL_SESSIONS_COUNT)] = 0
+#levels(train_roaming$ROAMING_SESSIONS_COUNT)[is.na(train_roaming$ROAMING_SESSIONS_COUNT)] = 0
 train_roaming$ROAMING_SESSIONS_COUNT[is.na(train_roaming$ROAMING_SESSIONS_COUNT)] = 0
 train_roaming$LOCAL_USAGE <- train_roaming$LOCAL_USAGE/(1024*1024)
 train_roaming$LOCAL_USAGE <- as.integer(train_roaming$LOCAL_USAGE)
-train_roaming$ROAMING_USAGE <- train_9_10$ROAMING_USAGE/(1024*1024)
-train_9_10$ROAMING_USAGE <- as.integer(train_roaming$ROAMING_USAGE)
+
+
+train_roaming$ROAMING_USAGE <- train_roaming$ROAMING_USAGE/(1024*1024)
+train_roaming$ROAMING_USAGE <- as.integer(train_roaming$ROAMING_USAGE)
+
+```
+
+
+
+```{r, cache=TRUE}
 
 train_roaming <- train_roaming[c(1,2,3,4,5,6,7,9,10,11,12,8)]
 
@@ -381,7 +401,9 @@ ALL with HANDSET                                           | sub_handset.csv    
 ALL with AGE, GENDER, VALUE_SEGMENT, HANDSET_NAME          | sub_all.csv                           |0.656
 
 
-```{r}
+```{r, cache=TRUE}
+
+
 
 contract_ref_train <- train_roaming
 contract_ref_train <- inner_join(contract_ref_train, contract_ref_new, by = "CONTRACT_KEY")
@@ -471,10 +493,16 @@ Having the .csv file which has the data prepared and joined together, then we'll
 
 ```{r, cache=TRUE}
 
-weekends <- read.csv("weekend.csv")
-workdays <- read.csv("working_day.csv")
+weekends <- read.csv("/Users/mayarelmohr/Documents/Semester10/DataScience/Vodafone2/StarBugs/VodafoneDataProject/weekend.csv")
+workdays <- read.csv("/Users/mayarelmohr/Documents/Semester10/DataScience/Vodafone2/StarBugs/VodafoneDataProject/working_day.csv")
+
+```
+
+```{r, cache=TRUE}
+
 weekends <- dplyr::select(weekends, -c( NO_OF_SESSIONS, ROAMING_FLAG,WEEKDAY_FLAG, TOTAL_MEG_CONSUMPTION ))
 weekends <- distinct(weekends)
+
 
 workdays <- dplyr::select(workdays, -c( NO_OF_SESSIONS, ROAMING_FLAG,WEEKDAY_FLAG, TOTAL_MEG_CONSUMPTION ))
 workdays <- distinct(workdays)
@@ -488,18 +516,21 @@ train_week$WEEK_END_CONSUMPTION[is.na(train_week$WEEK_END_CONSUMPTION)] = 0
 train_week <- train_week[c(1,2,3,4,5,6,9,8,10,12,11,7)]
 
 model <- nn(as.factor(TARGET)~. -CONTRACT_KEY, data= train_week)
-predictedFold <- data.frame(predict(model,  train_week[1:11], type = "class"))
-auc(as.numeric(train_week$TARGET), as.numeric(predictedFold$predict.model..train_week.1.11...type....class..))
+predictedFold <- data.frame(predict(model,   subset(train_week, select=-c(TARGET)), type = "class"))
+auc(as.numeric(train_week$TARGET), as.numeric(predictedFold$predict.model..subset.train_week..select....c.TARGET....type....class..))
 ```
+
 After adding the roaming to the training set along with weekend and weekdays
-```{r}
+```{r, cache=TRUE}
+
+
 roam_week <- read.csv("roam_week.csv")
 model <- nn(as.factor(TARGET)~. -CONTRACT_KEY, data= roam_week)
 
-predictedFold <- data.frame(predict(model,  roam_week[1:13], type = "class"))
-auc(as.numeric(roam_week$TARGET), as.numeric(predictedFold$predict.model..roam_week.1.13...type....class..))
 
 
+predictedFold <- data.frame(predict(model,   subset(roam_week, select=-c(TARGET)), type = "class"))
+auc(as.numeric(roam_week$TARGET), as.numeric(predictedFold$predict.model..subset.roam_week..select....c.TARGET....type....class..))
 ```
 
 Model Attributes                                           | Submission File Name                  | Accuracy
@@ -513,7 +544,8 @@ ALL, WEEKEND_CONSUMPTION, WEEKDAY_CONSUMPTION, ROAMING     | sub_weekend_weekday
 
 Let's join the "train" and our newly imputed "contract_ref_new" datasets:
 
-```{r}
+```{r, cache=TRUE}
+
 train_contract_ref <- inner_join(train, contract_ref_new, BY="CONTRACT_KEY")
 ```
 
@@ -523,7 +555,8 @@ train_contract_ref <- inner_join(train, contract_ref_new, BY="CONTRACT_KEY")
 We used Boruta Package in R as it works as a wrapper algorithm around Random Forest besides Azzure feature selection module to figure out the most important features that could contribute boosting the accuracy and the score of the model. Thus; it shows the relation between the attributes and excludes the highly correlated features.
 
 
-```{r}
+```{r, cache=TRUE}
+
 
 boruta.train <- Boruta(TARGET~.-CONTRACT_KEY, data = train_contract_ref, doTrace = 2)
 plot(boruta.train, xlab = "", xaxt = "n")
@@ -540,7 +573,11 @@ Applying the feature selection, It's obvious that the "TOTAL_CONSUMPTION" and th
 
 
 We applied feature selection using Azure machine learning, below is a plot showing the importance of training features in order according to their AUC score on percentage
-```{r}
+
+
+```{r, cache=TRUE}
+
+
 features <- read.csv("featureSelectionOriginal.csv")
 features$Score <- features$Score*100
 p1 <- ggplot(features, aes(features$Feature,features$Score,size=Score, label=''))
@@ -573,7 +610,9 @@ p + ggtitle("Features for Roaming inner join contract_ref") + ylab("AUC score in
 
 We permute over each month, and subtract three months consumption from the total consumption, excluding the consumption of the last month plus one of the other permuted month each time to produce 4 different submission files from each trained model. Below each submission file produced from a trained model and it's accuracy.
 
-```{r}
+```{r, cache=TRUE}
+
+
 ## First and Last Month
 train_6_10 <- train
 
@@ -584,10 +623,10 @@ train_6_10 <-  cbind(TOTAL_SESSIONS = (train_6_10$X209_SESSION_COUNT + train_6_1
 train_6_10 <- dplyr::select(train_6_10, -c( X209_SESSION_COUNT, X207_SESSION_COUNT, X208_SESSION_COUNT,
                                         X209_USAGE, X207_USAGE, X208_USAGE ))
 
-train_6_10 <- left_join(train_6_10, local_s, BY = "CONTRACT_KEY")
-train_6_10 <- left_join(train_6_10, local_c, BY = "CONTRACT_KEY")
-train_6_10 <- left_join(train_6_10, roaming_c, BY = "CONTRACT_KEY")
-train_6_10 <- left_join(train_6_10, roaming_s, BY = "CONTRACT_KEY")
+train_6_10 <- left_join(train_6_10, local_sessions_count, BY = "CONTRACT_KEY")
+train_6_10 <- left_join(train_6_10, local_consumption, BY = "CONTRACT_KEY")
+train_6_10 <- left_join(train_6_10, roaming_consumption, BY = "CONTRACT_KEY")
+train_6_10 <- left_join(train_6_10, roaming_sessions_count, BY = "CONTRACT_KEY")
 
 train_6_10$ROAMING_USAGE[is.na(train_6_10$ROAMING_USAGE)] = 0
 train_6_10$LOCAL_USAGE[is.na(train_6_10$LOCAL_USAGE)] = 0
@@ -605,6 +644,9 @@ model <- nn(as.factor(TARGET)~. -CONTRACT_KEY, data= train_6_10)
 predictedFold <- data.frame(predict(model,  train_6_10[1:11], type = "class"))
 auc(as.numeric(train_6_10$TARGET), as.numeric(predictedFold$predict.model..train_6_10.1.11...type....class..))
 
+```
+
+```{r, cache=TRUE}
 
 ##Second and Last Month
 
@@ -615,10 +657,10 @@ train_7_10 <-  cbind(TOTAL_SESSIONS = (train$X209_SESSION_COUNT + train$X206_SES
 
 train_7_10 <- dplyr::select(train_7_10, -c( X209_SESSION_COUNT, X206_SESSION_COUNT, X208_SESSION_COUNT,
                                         X209_USAGE, X206_USAGE, X208_USAGE ))
-train_7_10 <- left_join(train_7_10, local_s, BY = "CONTRACT_KEY")
-train_7_10 <- left_join(train_7_10, local_c, BY = "CONTRACT_KEY")
-train_7_10 <- left_join(train_7_10, roaming_c, BY = "CONTRACT_KEY")
-train_7_10 <- left_join(train_7_10, roaming_s, BY = "CONTRACT_KEY")
+train_7_10 <- left_join(train_7_10, local_sessions_count, BY = "CONTRACT_KEY")
+train_7_10 <- left_join(train_7_10, local_consumption, BY = "CONTRACT_KEY")
+train_7_10 <- left_join(train_7_10, roaming_consumption, BY = "CONTRACT_KEY")
+train_7_10 <- left_join(train_7_10, roaming_sessions_count, BY = "CONTRACT_KEY")
 
 train_7_10$ROAMING_USAGE[is.na(train_7_10$ROAMING_USAGE)] = 0
 train_7_10$LOCAL_USAGE[is.na(train_7_10$LOCAL_USAGE)] = 0
@@ -634,6 +676,9 @@ train_7_10 <- train_7_10[c(1,2,3,4,5,6,7,9,10,11,12,8)]
 model <- nn(as.factor(TARGET)~. -CONTRACT_KEY, data= train_7_10)
 predictedFold <- data.frame(predict(model,  train_7_10[1:11], type = "class"))
 auc(as.numeric(train_7_10$TARGET), as.numeric(predictedFold$predict.model..train_7_10.1.11...type....class..))
+```
+
+```{r, cache=TRUE}
 
 ### Accuracy of 3rd and last Month
 
@@ -647,10 +692,10 @@ train_8_10 <-  cbind(TOTAL_SESSIONS = (train$X209_SESSION_COUNT + train$X206_SES
 train_8_10 <- dplyr::select(train_8_10, -c( X209_SESSION_COUNT, X206_SESSION_COUNT, X207_SESSION_COUNT,
                                         X209_USAGE, X206_USAGE, X207_USAGE ))
 
-train_8_10 <- left_join(train_8_10, local_s, BY = "CONTRACT_KEY")
-train_8_10 <- left_join(train_8_10, local_c, BY = "CONTRACT_KEY")
-train_8_10 <- left_join(train_8_10, roaming_c, BY = "CONTRACT_KEY")
-train_8_10 <- left_join(train_8_10, roaming_s, BY = "CONTRACT_KEY")
+train_8_10 <- left_join(train_8_10, local_sessions_count, BY = "CONTRACT_KEY")
+train_8_10 <- left_join(train_8_10, local_consumption, BY = "CONTRACT_KEY")
+train_8_10 <- left_join(train_8_10, roaming_consumption, BY = "CONTRACT_KEY")
+train_8_10 <- left_join(train_8_10, roaming_sessions_count, BY = "CONTRACT_KEY")
 
 train_8_10$ROAMING_USAGE[is.na(train_8_10$ROAMING_USAGE)] = 0
 train_8_10$LOCAL_USAGE[is.na(train_8_10$LOCAL_USAGE)] = 0
@@ -681,11 +726,9 @@ ALL, X209, X210                                            | sub_X209_X210.csv  
 
 ###Model ensembling:
 
-Where we have done ensembling on all the previously mentioned trained models and the submission files of the test data, using the "Kaggle_avg.py" script [link](https://github.com/MLWave/Kaggle-Ensemble-Guide/blob/master/kaggle_avg.py),  
+Where we created ensembles from all the previous submission files, using the "Kaggle_avg.py" script [link](https://github.com/MLWave/Kaggle-Ensemble-Guide/blob/master/kaggle_avg.py).
 
 The following JavaScript chart shows how each submission file contributed in our final submission.
-![](spider.png)
-
-
-                           
+  ![](spider.png)
+             
                            
