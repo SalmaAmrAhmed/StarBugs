@@ -47,12 +47,12 @@ We started with loading the data:
 
 ```{r, cache=TRUE}
 
-contract_ref <- read.csv("/Users/mayarelmohr/Documents/Semester10/DataScience/Vodafone2/StarBugs/VodafoneDataProject/contract_ref.csv")
-daily_aggregate <- read.csv("/Users/mayarelmohr/Documents/Semester10/DataScience/Vodafone2/StarBugs/VodafoneDataProject/daily_aggregate.csv")
-roaming_monthly <- read.csv("/Users/mayarelmohr/Documents/Semester10/DataScience/Vodafone2/StarBugs/VodafoneDataProject/roaming_monthly.csv")
-calendar_ref <- read.csv("/Users/mayarelmohr/Documents/Semester10/DataScience/Vodafone2/StarBugs/VodafoneDataProject/calendar_ref.csv")
-test <- read.csv("/Users/mayarelmohr/Documents/Semester10/DataScience/Vodafone2/StarBugs/VodafoneDataProject/test.csv")
-train <- read.csv("/Users/mayarelmohr/Documents/Semester10/DataScience/Vodafone2/StarBugs/VodafoneDataProject/train.csv")
+contract_ref <- read.csv("csv/contract_ref.csv")
+daily_aggregate <- read.csv("csv/daily_aggregate.csv")
+roaming_monthly <- read.csv("csv/roaming_monthly.csv")
+calendar_ref <- read.csv("csv/calendar_ref.csv")
+test <- read.csv("csv/test.csv")
+train <- read.csv("csv/train.csv")
 ```
 
 then, started **data exploration**, **cleaning** and **preparation**
@@ -69,7 +69,7 @@ daily_aggregate %>% str()
 test %>% str()
 ```
 
-![](variables.png)
+![](images/variables.png)
 
 ###Missing Values Treatment:
 
@@ -326,10 +326,10 @@ Having all the roaming and local usage and number of sessions prepared in extrer
 ```{r, cache=TRUE}
 
 
-local_consumption <- read.csv("local_consumption.csv")
-roaming_consumption <- read.csv("roaming_consumption.csv")
-local_sessions_count <- read.csv("local_sessions_count.csv")
-roaming_sessions_count <- read.csv("roaming_sessions_count.csv")
+local_consumption <- read.csv("csv/local_consumption.csv")
+roaming_consumption <- read.csv("csv/roaming_consumption.csv")
+local_sessions_count <- read.csv("csv/local_sessions_count.csv")
+roaming_sessions_count <- read.csv("csv/roaming_sessions_count.csv")
 
 ```
 
@@ -493,8 +493,8 @@ Having the .csv file which has the data prepared and joined together, then we'll
 
 ```{r, cache=TRUE}
 
-weekends <- read.csv("/Users/mayarelmohr/Documents/Semester10/DataScience/Vodafone2/StarBugs/VodafoneDataProject/weekend.csv")
-workdays <- read.csv("/Users/mayarelmohr/Documents/Semester10/DataScience/Vodafone2/StarBugs/VodafoneDataProject/working_day.csv")
+weekends <- read.csv("csv/weekend.csv")
+workdays <- read.csv("csv/working_day.csv")
 
 ```
 
@@ -524,7 +524,7 @@ After adding the roaming to the training set along with weekend and weekdays
 ```{r, cache=TRUE}
 
 
-roam_week <- read.csv("roam_week.csv")
+roam_week <- read.csv("csv/roam_week.csv")
 model <- nn(as.factor(TARGET)~. -CONTRACT_KEY, data= roam_week)
 
 
@@ -578,32 +578,26 @@ We applied feature selection using Azure machine learning, below is a plot showi
 ```{r, cache=TRUE}
 
 
-features <- read.csv("featureSelectionOriginal.csv")
+features <- read.csv("csv/featureSelectionOriginal.csv")
 features$Score <- features$Score*100
-p1 <- ggplot(features, aes(features$Feature,features$Score,size=Score, label=''))
-p1 <- p1 +geom_point(colour='darkolivegreen3')  + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + theme(panel.background = element_rect(fill = alpha( 'gray', 0.2)))
-p1 + ggtitle("Features for Roaming consumption") + ylab("AUC score in percentage")
 
-featuresWeek <- read.csv("featureWeek.csv")
+ggplot(features, aes(features$Feature,features$Score,size=Score, label='')) +geom_point(colour='darkolivegreen3')  + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + theme(panel.background = element_rect(fill = alpha( 'gray', 0.2))) +ggtitle("Features for Roaming consumption") + ylab("AUC score in percentage") + xlab('Features')
+
+featuresWeek <- read.csv("csv/featureWeek.csv")
 featuresWeek$Score <- featuresWeek$Score*100
-p2 <- ggplot(featuresWeek, aes(featuresWeek$Feature,featuresWeek$Score,size=Score, label=''))
-p2 <- p2+geom_point(colour='deepskyblue1')  + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + theme(panel.background = element_rect(fill = alpha( 'gray', 0.2)))
-p2 + ggtitle("Features Using consumption in working days and weekends") 
+ ggplot(featuresWeek, aes(featuresWeek$Feature,featuresWeek$Score,size=Score, label='')) +geom_point(colour='deepskyblue1')  + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + theme(panel.background = element_rect(fill = alpha( 'gray', 0.2))) + xlab('Features')+ ggtitle("Features Using consumption in working days and weekends") 
 
-grid.arrange(p1, p2, ncol=2, main=textGrob("Consumption according to Weekend and Working days Vs Roaming and Local"))
 
-featuresrw <- read.csv("featuresrw.csv")
+featuresrw <- read.csv("csv/featuresrw.csv")
 featuresrw$Score <- featuresrw$Score*100
 p <- ggplot(featuresrw, aes(featuresrw$Feature,featuresrw$Score,size=Score, label=''))
 p <- p+geom_point(colour='deepskyblue1')  + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + theme(panel.background = element_rect(fill = alpha( 'gray', 0.2)))
-p + xlab("Features for consumption in local, Roaming,weekends and working days") + ylab("AUC score in percentage")
+p + xlab("Features") + ylab("AUC score in percentage") + ggtitle(' for consumption in local, Roaming,weekends and working days')
 
 
-featuresContract <- read.csv("featuresAll.csv")
+featuresContract <- read.csv("csv/featuresAll.csv")
 featuresContract$Score <- featuresContract$Score*100
-p <- ggplot(featuresContract, aes(featuresContract$Feature,featuresContract$Score,size=Score, label=''))
-p <- p+geom_point(colour='darkolivegreen3')  + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + theme(panel.background = element_rect(fill = alpha( 'gray', 0.2)))
-p + ggtitle("Features for Roaming inner join contract_ref") + ylab("AUC score in percentage")
+ggplot(featuresContract, aes(featuresContract$Feature,featuresContract$Score,size=Score, label='')) + geom_point(colour='darkolivegreen3')  + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + theme(panel.background = element_rect(fill = alpha( 'gray', 0.2))) + ggtitle('Features for Roaming inner join contract_ref') + ylab("AUC score in percentage") + xlab('Features')
 
 
 ```
@@ -729,6 +723,6 @@ ALL, X209, X210                                            | sub_X209_X210.csv  
 Where we created ensembles from all the previous submission files, using the "Kaggle_avg.py" script [link](https://github.com/MLWave/Kaggle-Ensemble-Guide/blob/master/kaggle_avg.py).
 
 The following JavaScript chart shows how each submission file contributed in our final submission.
-  ![](spider.png)
+  ![](images/spider.png)
              
                            
