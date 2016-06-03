@@ -681,18 +681,10 @@ ALL, X209, X210                                            | sub_X209_X210.csv  
 
 ###Model ensembling:
 
-Where we created ensembles from all the previous submission files, using the "Kaggle_avg.py" script [link](https://github.com/MLWave/Kaggle-Ensemble-Guide/blob/master/kaggle_avg.py).
+Where we have done ensembling on all the previously mentioned trained models and the submission files of the test data, using the "Kaggle_avg.py" script [link](https://github.com/MLWave/Kaggle-Ensemble-Guide/blob/master/kaggle_avg.py),  
 
-//Image shows how each submission file contributed in our final submission after applying ensembling over all files.
-
-
-#####KFold Cross Validations:
-
-```{r}
-
-```
-
-
+The Below chart shows how each submission file contributed in our final submission.
+![](spider.png)
 
 
                            
