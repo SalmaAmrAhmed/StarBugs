@@ -36,6 +36,8 @@ library(plyr)
 library(DMwR)
 library(RWeka)
 library(pROC)
+library(gridExtra)
+
 ```
 
 We started with loading the data:
@@ -85,15 +87,7 @@ Imputing the NA's of the VALUE_SEGMENT in table contract_ref, using KNN Imputati
 contract_ref_imputed <- knnImputation(contract_ref)
 ```
 
-then, Value segments of 'Med-Low' and 'Med-High' were both combined to a 'Medium' value segment 
-
-```{r}
-levels(contract_ref_imputed$VALUE_SEGMENT)[contract_ref_imputed$VALUE_SEGMENT == "Med-High"] = "Medium"
-levels(contract_ref_imputed$VALUE_SEGMENT)[contract_ref_imputed$VALUE_SEGMENT == "Med-Low"] = "Medium"
-contract_ref_imputed$VALUE_SEGMENT[contract_ref_imputed$VALUE_SEGMENT == "Med-High"] = "Medium"
-contract_ref_imputed$VALUE_SEGMENT[contract_ref_imputed$VALUE_SEGMENT == "Med-Low"] = "Medium"
-
-```                 
+    
 
 
 
@@ -101,7 +95,7 @@ contract_ref_imputed$VALUE_SEGMENT[contract_ref_imputed$VALUE_SEGMENT == "Med-Lo
 
 First we change the gender values to Male, Female, Not enetered, instead of having f, F, m, M, Unknown.
 
-```{r}
+```{r, cache=TRUE}
 levels(contract_ref_imputed$GENDER)[levels(contract_ref_imputed$GENDER) == "F"] <- "Female"
 levels(contract_ref_imputed$GENDER)[levels(contract_ref_imputed$GENDER) == "f"] <- "Female"
 levels(contract_ref_imputed$GENDER)[levels(contract_ref_imputed$GENDER) == "m"] <- "Male"
@@ -111,16 +105,13 @@ levels(contract_ref_imputed$GENDER)[levels(contract_ref_imputed$GENDER) == "Unkn
 
 Proceed plotting the GENDER distribution:
 
-```{r}
+```{r, cache=TRUE}
 train_contract_ref_imputed <- inner_join(train, contract_ref_imputed, BY = "CONTRACT_KEY")
 
 
-ggplot() + geom_histogram(data = train_contract_ref_imputed, aes(x=as.numeric(rp.hours), y=..density..), colour = "gray", fill = "white", binwidth = 2)  + geom_density(data = filteredColumns, aes(x = as.numeric(rp.hours)), alpha = .2, fill = "magenta") + ggtitle("Total number of reports Vs rush hours")
 
-
-
-qplot(TARGET, data=train_contract_ref_imputed, fill=GENDER, geom="bar")
-qplot(GENDER, data=train_contract_ref_imputed, fill=factor(TARGET))
+qplot(TARGET, data=train_contract_ref_imputed, fill=GENDER, geom="bar") + scale_fill_manual(values=c("darkolivegreen3", "deepskyblue1", "gray"))
+qplot(GENDER, data=train_contract_ref_imputed, fill=factor(TARGET))  + scale_fill_manual(values=c("darkolivegreen3", "deepskyblue1"))
 
 ```
 
@@ -137,7 +128,8 @@ We performed Mean Imputation according to the corresponding value segment, where
 2- Group with age = 99
 
 
-```{r}
+
+```{r, cache=TRUE}
 
 contract_ref_filtered = filter(contract_ref_imputed, as.numeric(contract_ref_imputed$AGE) >= 16)
 contract_ref_filtered = filter(contract_ref_imputed, as.numeric(contract_ref_imputed$AGE) <= 95)
@@ -147,35 +139,35 @@ contract_ref_unfiltered = anti_join(contract_ref_imputed, contract_ref_filtered,
 
 
 age_of_Core_Segment <- data.frame( contract_ref_filtered$AGE[contract_ref_filtered$VALUE_SEGMENT == 'Core'])
-ggplot() + geom_bar(data = age_of_Core_Segment, aes(x=age_of_Core_Segment$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....))  + ggtitle("Age of Core Value segment") + xlab("Age")
+p1 <- ggplot() + geom_bar(data = age_of_Core_Segment, aes(x=age_of_Core_Segment$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....), fill = "darkolivegreen3" )  + ggtitle("Age of Core Value segment") + xlab("Age")
 
 mean_core <- mean(as.numeric(age_of_Core_Segment$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....), na.rm= TRUE)
 
 age_of_Med_low <- data.frame( contract_ref_filtered$AGE[contract_ref_filtered$VALUE_SEGMENT == 'Med-Low']) 
-ggplot() + geom_bar(data = age_of_Med_low, aes(x=age_of_Med_low$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....)) + ggtitle("Age of Med Low Value segment") + xlab("Age") 
+p2 <-  geom_bar(data = age_of_Med_low, aes(x=age_of_Med_low$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....), fill = "deepskyblue1 ", alpha = 0.4 ) + ggtitle("Age of Med Low Value segment") + xlab("Age") 
 
 
 mean_med_low <- mean(as.numeric(age_of_Med_low$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....), na.rm= TRUE)
 
 age_of_High_Segment <- data.frame( contract_ref_filtered$AGE[contract_ref_filtered$VALUE_SEGMENT == 'High'])
-ggplot() + geom_bar(data = age_of_High_Segment, aes(x=age_of_High_Segment$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....))  + ggtitle("Age of High Value segment") + xlab("Age")
+p3 <- ggplot() + geom_bar(data = age_of_High_Segment, aes(x=age_of_High_Segment$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....),  fill = "deepskyblue1")  + ggtitle("Age of High Value segment") + xlab("Age")
 
 
 mean_high <- mean(as.numeric(age_of_High_Segment$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....), na.rm= TRUE)
 
 age_of_Med_High_Segment <- data.frame( contract_ref_filtered$AGE[contract_ref_filtered$VALUE_SEGMENT == 'Med-High'])
-ggplot() + geom_bar(data = age_of_Med_High_Segment, aes(x=age_of_Med_High_Segment$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....))  + ggtitle("Age of Mid-High Value segment") + xlab("Age")
+p4 <- ggplot() + geom_bar(data = age_of_Med_High_Segment, aes(x=age_of_Med_High_Segment$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....),  fill = "darkolivegreen3")  + ggtitle("Age of Mid-High Value segment") + xlab("Age")
 mean_med_high <- mean(as.numeric(age_of_Med_High_Segment$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....), na.rm= TRUE)
 
 
 age_of_premium <- data.frame( contract_ref_filtered$AGE[contract_ref_filtered$VALUE_SEGMENT == 'Premium'])
-ggplot() + geom_bar(data = age_of_premium, aes(x=age_of_premium$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....))  + ggtitle("Age of premium Value segment") + xlab("Age")
+p5 <- ggplot() + geom_bar(data = age_of_premium, aes(x=age_of_premium$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....),,  fill = "deepskyblue1")  + ggtitle("Age of premium Value segment") + xlab("Age")
 mean_premium <- mean(as.numeric(age_of_premium$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....), na.rm= TRUE)
 
 
 
 age_of_platinum <- data.frame( contract_ref_filtered$AGE[contract_ref_filtered$VALUE_SEGMENT == 'Platinum'])
-ggplot() + geom_bar(data = age_of_platinum, aes(x=age_of_platinum$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....))  + ggtitle("Age of platinum Value segment") + xlab("Age")
+p6 <- ggplot() + geom_bar(data = age_of_platinum, aes(x=age_of_platinum$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....),  fill = "darkolivegreen3")  + ggtitle("Age of platinum Value segment") + xlab("Age")
 mean_platinum <- mean(as.numeric(age_of_platinum$contract_ref_filtered.AGE.contract_ref_filtered.VALUE_SEGMENT....), na.rm = TRUE)
 
 contract_ref_unfiltered$AGE[contract_ref_unfiltered$VALUE_SEGMENT ==as.character("Core") ] = as.integer(mean_core)
@@ -192,16 +184,41 @@ contract_ref_new = bind_rows(contract_ref_unfiltered, contract_ref_filtered)
 
 ```
 
+Value segments of 'Med-Low' and 'Med-High' were both combined to a 'Medium' value segment 
+
+```{r, cache=TRUE}
+levels(contract_ref_new$VALUE_SEGMENT)[contract_ref_new$VALUE_SEGMENT == "Med-High"] = "Medium"
+levels(contract_ref_new$VALUE_SEGMENT)[contract_ref_new$VALUE_SEGMENT == "Med-Low"] = "Medium"
+contract_ref_new$VALUE_SEGMENT[contract_ref_new$VALUE_SEGMENT == "Med-High"] = "Medium"
+contract_ref_new$VALUE_SEGMENT[contract_ref_new$VALUE_SEGMENT == "Med-Low"] = "Medium"
+
+```             
+
+Below is a graph for age distribution within each value segment
+
+```{r cache = true}
+
+grid.arrange(p1,p2,p3,p4,p5,p6, ncol = 2, nrow = 3)
+```
+
+
+
 
 ####4.HANDSET NAME
 
 Handset names were grouped by types to reduce their levels according to the brand where we assumed that the handset would affect the consumption especially the internet usage.
 We googled and researched the mobiles of unfamilar brands to group them together, also we figured that some of the handsets resembled companies and agencies thus we grouped them together to a new level called "Agency"
 
-They were clustered into //// levels
-Below is a graph //// code here there 
+They were clustered into less levels
+Below is a graph showing the occurence of value segments within the given contract _ref
+```{r, cache=TRUE}
 
-```{r}
+
+ggplot() + geom_bar(data = contract_ref_new, aes(x=VALUE_SEGMENT),  fill = "darkolivegreen3")  + ggtitle("Occurence of Value segments withing the given contract _ref") + xlab("Value Segment")
+```
+
+
+```{r, cache=TRUE}
 
 contract_ref_new$HANDSET_NAME <- sub(".*Samsung.*", "Samsung", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
 contract_ref_new$HANDSET_NAME <- sub(".*Sony.*", "Sony", contract_ref_new$HANDSET_NAME, ignore.case = TRUE)
@@ -275,11 +292,29 @@ contract_ref_new$HANDSET_NAME <- as.factor(contract_ref_new$HANDSET_NAME)
 
 ```
 
+After doing, some feature engineering, we created a new instance of traing set that has the usage and session counts of the last two month, in addition to the total of usage and sessions of the first three months, with AUC score = 0.667
+```{r}
+
+train_9_10 <- train
+
+train_9_10  <-  cbind(TOTAL_USAGE = (train$X206_USAGE + train$X207_USAGE  +train$X208_USAGE ), train_9_10)
+
+train_9_10 <-  cbind(TOTAL_SESSIONS = (train$X206_SESSION_COUNT + train$X207_SESSION_COUNT  +train$X208_SESSION_COUNT ), train_9_10)
+
+train_9_10 <- dplyr::select(train_9_10, -c( X206_SESSION_COUNT, X207_SESSION_COUNT, X208_SESSION_COUNT,
+ X206_USAGE, X207_USAGE, X208_USAGE ))
+nn <- make_Weka_classifier("weka/classifiers/functions/MultilayerPerceptron")
+model <- nn(as.factor(TARGET)~. -CONTRACT_KEY, data= train_9_10)
+predictedFold <- data.frame(predict(model,  train_9_10[1:7], type = "class"))
+auc(as.numeric(train_9_10$TARGET), as.numeric(predictedFold$predict.model..train_9_10.1.7...type....class..))
+
+```
+
+
 
 Next, we inspect and plot the **daily_aggregate** to get some sights about the ROAMING and LOCAL:
 Having all the roaming and local usage and number of sessions prepared in extrernal .csv file, we load them directly, then join the tables accordingly:
 
-///fill the join code
 
 
 ```{r}
@@ -288,10 +323,43 @@ roaming_consumption <- read.csv("roaming_consumption.csv")
 local_sessions_count <- read.csv("local_sessions_count.csv")
 roaming_sessions_count <- read.csv("roaming_sessions_count.csv")
 
+```
+
+Here, we add the roaming and local consumption of the last two months to the new training set, with AUC score 0.6768
+
+```{r}
 
 
+train_roaming <- left_join(train_9_10, local_sessions_count, BY = "CONTRACT_KEY")
+train_roaming <- left_join(train_roaming, local_consumption, BY = "CONTRACT_KEY")
+train_roaming <- left_join(train_roaming, roaming_consumption, BY = "CONTRACT_KEY")
+train_roaming <- left_join(train_roaming, roaming_sessions_count, BY = "CONTRACT_KEY")
+train_roaming$ROAMING_USAGE[is.na(train_roaming$ROAMING_USAGE)] = 0
+train_roaming$LOCAL_USAGE[is.na(train_roaming$LOCAL_USAGE)] = 0
+train_roaming$LOCAL_SESSIONS_COUNT[is.na(train_roaming$LOCAL_SESSIONS_COUNT)] = 0
+train_roaming$ROAMING_SESSIONS_COUNT[is.na(train_roaming$ROAMING_SESSIONS_COUNT)] = 0
+train_roaming$LOCAL_USAGE <- train_roaming$LOCAL_USAGE/(1024*1024)
+train_roaming$LOCAL_USAGE <- as.integer(train_roaming$LOCAL_USAGE)
+train_roaming$ROAMING_USAGE <- train_9_10$ROAMING_USAGE/(1024*1024)
+train_9_10$ROAMING_USAGE <- as.integer(train_roaming$ROAMING_USAGE)
+
+train_roaming <- train_roaming[c(1,2,3,4,5,6,7,9,10,11,12,8)]
+
+model <- nn(as.factor(TARGET)~. -CONTRACT_KEY, data= train_roaming)
+predictedFold <- data.frame(predict(model,  train_roaming[1:11], type = "class"))
+auc(as.numeric(train_roaming$TARGET), as.numeric(predictedFold$predict.model..train_roaming.1.11...type....class..))
 
 ```
+
+
+
+Next, we added the contract_ref to the training set along with roaming to test accuracy, we used 4 permutations
+1- using age only along with the training and roaming
+2- using gender only along with the training and roaming
+3- using Handset names only along with the training and roaming
+4- using value_segment only along with the training and roaming
+5- using permuations of the above parameters with the training and roaming
+
 
 
 Having the ROAMING_CONSUMPTION, LOCAL_CONSUMPTION prepared beside the previously prepared dataset attributes, we train the datasets having different models and different submission files:
@@ -304,71 +372,139 @@ ALL                                                        | sub_roaming_train.c
 ALL except LOCAL, ROAMING sessions count                   | sub_roaming_train-session.csv         | 0.6744
 ALL except LOCAL, ROAMING sessions count & ROAMING_USAGE   | sub_roaming_train-session-roaming.csv | 0.6629
 BASE SET WITH NO ROAMING NOR LOCAL                         | sub_original_train.csv                | 0.667
-ALL with AGE                                               | sub_age.csv                           |
-ALL with GENDER                                            | sub_gender.csv                        |
-ALL with VALUE_SEGMENT                                     | sub_valuesegment.csv                  |
-ALL with AGE, GENDER                                       | sub_age_gender.csv                    |
-ALL with AGE, GENDER, VALUE_SEGMENT                        | sub_age_gender_valuesegment.csv       |
-ALL with HANDSET                                           | sub_handset.csv                       |
-ALL with AGE, GENDER, VALUE_SEGMENT, HANDSET_NAME          | sub_all.csv                           |
+ALL with AGE                                               | sub_age.csv                           | 0.678
+ALL with GENDER                                            | sub_gender.csv                        | 0.6493
+ALL with VALUE_SEGMENT                                     | sub_value_segment.csv                 | 0.6409
+ALL with AGE, GENDER                                       | sub_age_gender.csv                    |0.6339
+ALL with AGE, GENDER, VALUE_SEGMENT                        | sub_age_gender_valuesegment.csv       |0.6281
+ALL with HANDSET                                           | sub_handset.csv                       |0.6487
+ALL with AGE, GENDER, VALUE_SEGMENT, HANDSET_NAME          | sub_all.csv                           |0.656
 
-//Load code
 
 ```{r}
 
+contract_ref_train <- train_roaming
+contract_ref_train <- inner_join(contract_ref_train, contract_ref_new, by = "CONTRACT_KEY")
+contract_ref_train <- dplyr::select(contract_ref_train, -c(RATE_PLAN, X209_SESSION_COUNT,
+LOCAL_USAGE,
+LOCAL_SESSIONS_COUNT, GENDER, VALUE_SEGMENT, HANDSET_NAME
+ ))
+
+contract_ref_train <- contract_ref_train[c(1,2,3,4,5,6,7,8,10,9)]
+
+model <- nn(as.factor(TARGET)~. - CONTRACT_KEY, data= contract_ref_train)
+predictedFold <- data.frame(predict(model,  contract_ref_train[1:9], type = "class"))
+auc(as.numeric(contract_ref_train$TARGET), as.numeric(predictedFold$predict.model..contract_ref_train.1.9...type....class..))
+
+##GENDER
+
+contract_ref_train <- train_roaming
+contract_ref_train <- inner_join(contract_ref_train, contract_ref_new, by = "CONTRACT_KEY")
+contract_ref_train <- dplyr::select(contract_ref_train, -c(RATE_PLAN, X209_SESSION_COUNT,
+LOCAL_USAGE,
+LOCAL_SESSIONS_COUNT, AGE, VALUE_SEGMENT, HANDSET_NAME
+ ))
+
+contract_ref_train <- contract_ref_train[c(1,2,3,4,5,6,7,8,10,9)]
+
+model <- nn(as.factor(TARGET)~. - CONTRACT_KEY, data= contract_ref_train)
+predictedFold <- data.frame(predict(model,  contract_ref_train[1:9], type = "class"))
+auc(as.numeric(contract_ref_train$TARGET), as.numeric(predictedFold$predict.model..contract_ref_train.1.9...type....class..))
+
+##VALUE_SEGMENT
 
 
+contract_ref_train <- train_roaming
+contract_ref_train <- inner_join(contract_ref_train, contract_ref_new, by = "CONTRACT_KEY")
+contract_ref_train <- dplyr::select(contract_ref_train, -c(RATE_PLAN, X209_SESSION_COUNT,
+LOCAL_USAGE,
+LOCAL_SESSIONS_COUNT, AGE, GENDER, HANDSET_NAME
+ ))
+
+contract_ref_train <- contract_ref_train[c(1,2,3,4,5,6,7,8,10,9)]
+
+model <- nn(as.factor(TARGET)~. - CONTRACT_KEY, data= contract_ref_train)
+predictedFold <- data.frame(predict(model,  contract_ref_train[1:9], type = "class"))
+auc(as.numeric(contract_ref_train$TARGET), as.numeric(predictedFold$predict.model..contract_ref_train.1.9...type....class..))
+
+## AGE, GENDER
 
 
+contract_ref_train <- train_roaming
+contract_ref_train <- inner_join(contract_ref_train, contract_ref_new, by = "CONTRACT_KEY")
+contract_ref_train <- dplyr::select(contract_ref_train, -c(RATE_PLAN, X209_SESSION_COUNT,
+LOCAL_USAGE,
+LOCAL_SESSIONS_COUNT, VALUE_SEGMENT, HANDSET_NAME
+ ))
+
+contract_ref_train <- contract_ref_train[c(1,2,3,4,5,6,7,8,10,11,9)]
+
+model <- nn(as.factor(TARGET)~. - CONTRACT_KEY, data= contract_ref_train)
+predictedFold <- data.frame(predict(model,  contract_ref_train[1:10], type = "class"))
+auc(as.numeric(contract_ref_train$TARGET), as.numeric(predictedFold$predict.model..contract_ref_train.1.10...type....class..))
+
+##AGE, GENDER, VALUE_SEGMENT
+
+
+contract_ref_train <- train_roaming
+contract_ref_train <- inner_join(contract_ref_train, contract_ref_new, by = "CONTRACT_KEY")
+contract_ref_train <- dplyr::select(contract_ref_train, -c(RATE_PLAN, X209_SESSION_COUNT,
+LOCAL_USAGE,
+LOCAL_SESSIONS_COUNT, HANDSET_NAME
+ ))
+
+contract_ref_train <- contract_ref_train[c(1,2,3,4,5,6,7,8,10,11,12,9)]
+
+model <- nn(as.factor(TARGET)~. - CONTRACT_KEY, data= contract_ref_train)
+predictedFold <- data.frame(predict(model,  contract_ref_train[1:11], type = "class"))
+auc(as.numeric(contract_ref_train$TARGET), as.numeric(predictedFold$predict.model..contract_ref_train.1.11...type....class..))
 
 
 ```
+
+Permutations with HANDSET_NAME were implemented using **AZURE Machine Learning Library** using a Two Class Boosted decision tree for classification
 
 
 Next, we inspect and plot the **calendar_ref** and join it with the daily_aggregate dataset.
 Having the .csv file which has the data prepared and joined together, then we'll proceed on calculating for each user the total consumption on week days and non-week days, then change it to Mega bytes, finally we train our model and calculate the auc and produce a submission file:
 
-////add the csv submission file and the needed plots
 
-```{r}
-week_flag <- read.csv("week_flag.csv")
-week_flag1 = mutate(week_flag, TOTAL_MEG_CONSUMPTION = as.integer(week_flag$TOTAL_CONSUMPTION/(1024*1024)))
-week_flag1 <- dplyr::select(week_flag1, -c(CALL_DATE_KEY, MONTH_KEY, CELL_KEY, MONTH_NAME, FULL_DATE, DAY_NAME, TOTAL_CONSUMPTION))
-weekDay = filter(week_flag1, WEEKDAY_FLAG == "Y")
-weekEnd = filter(week_flag1, WEEKDAY_FLAG == "N")
-weekDay1 =aggregate(weekDay$TOTAL_MEG_CONSUMPTION,by=weekDay['CONTRACT_KEY'],FUN=sum)
-weekDay<- weekDay   %>% right_join(weekDay1, by = "CONTRACT_KEY")
-colnames(weekDay)[6] <- "WEEK_DAY_CONSUMPTION"
-weekDay1 =aggregate(weekDay$NO_OF_SESSIONS,by=weekDay['CONTRACT_KEY'],FUN=sum)
-weekDay<- weekDay   %>% right_join(weekDay1, by = "CONTRACT_KEY")
-colnames(weekDay)[7] <- "WEEK_DAY_SESSIONS"
-weekEnd1 =aggregate(weekEnd$TOTAL_MEG_CONSUMPTION,by=weekEnd['CONTRACT_KEY'],FUN=sum)
-weekEnd<- weekEnd   %>% right_join(weekEnd1, by = "CONTRACT_KEY")
-colnames(weekEnd)[6] <- "WEEK_END_CONSUMPTION"
-weekEnd1 =aggregate(weekEnd$NO_OF_SESSIONS,by=weekEnd['CONTRACT_KEY'],FUN=sum)
-weekEnd<- weekEnd   %>% right_join(weekEnd1, by = "CONTRACT_KEY")
-colnames(weekEnd)[7] <- "WEEK_END_SESSIONS"
-weeks = rbind(weekDay, weekEnd)
-weekends <- dplyr::select(weekends, -c(NO_OF_SESSIONS, ROAMING_FLAG,WEEKDAY_FLAG, TOTAL_MEG_CONSUMPTION ))
+```{r, cache=TRUE}
+
+weekends <- read.csv("weekend.csv")
+workdays <- read.csv("working_day.csv")
+weekends <- dplyr::select(weekends, -c( NO_OF_SESSIONS, ROAMING_FLAG,WEEKDAY_FLAG, TOTAL_MEG_CONSUMPTION ))
 weekends <- distinct(weekends)
-weekDay <- dplyr::select(weekDay, -c(NO_OF_SESSIONS, ROAMING_FLAG,WEEKDAY_FLAG, TOTAL_MEG_CONSUMPTION ))
-weekDay <- distinct(weekDay)
-train_week <- left_join(train2, weekDay, BY = "CONTRACT_KEY")
+
+workdays <- dplyr::select(workdays, -c( NO_OF_SESSIONS, ROAMING_FLAG,WEEKDAY_FLAG, TOTAL_MEG_CONSUMPTION ))
+workdays <- distinct(workdays)
+
+train_week <- left_join(train_9_10, workdays, BY = "CONTRACT_KEY")
 train_week <- left_join(train_week, weekends, BY = "CONTRACT_KEY")
 train_week$WEEK_DAY_SESSIONS[is.na(train_week$WEEK_DAY_SESSIONS)] = 0
 train_week$WEEK_DAY_CONSUMPTION[is.na(train_week$WEEK_DAY_CONSUMPTION)] = 0
 train_week$WEEK_END_SESSIONS[is.na(train_week$WEEK_END_SESSIONS)] = 0
 train_week$WEEK_END_CONSUMPTION[is.na(train_week$WEEK_END_CONSUMPTION)] = 0
 train_week <- train_week[c(1,2,3,4,5,6,9,8,10,12,11,7)]
-write.csv(train_week, "tra_week.csv", row.names = FALSE)
+
 model <- nn(as.factor(TARGET)~. -CONTRACT_KEY, data= train_week)
 predictedFold <- data.frame(predict(model,  train_week[1:11], type = "class"))
 auc(as.numeric(train_week$TARGET), as.numeric(predictedFold$predict.model..train_week.1.11...type....class..))
 ```
+After adding the roaming to the training set along with weekend and weekdays
+```{r}
+roam_week <- read.csv("roam_week.csv")
+model <- nn(as.factor(TARGET)~. -CONTRACT_KEY, data= roam_week)
+
+predictedFold <- data.frame(predict(model,  roam_week[1:13], type = "class"))
+auc(as.numeric(roam_week$TARGET), as.numeric(predictedFold$predict.model..roam_week.1.13...type....class..))
+
+
+```
 
 Model Attributes                                           | Submission File Name                  | Accuracy
 -----------------------------------------------------------| --------------------------------------| --------
-ALL, WEEKEND_CONSUMPTION, WEEKDAY_CONSUMPTION, ROAMUNG     | sub_weekend_weekday.csv               | 
+ALL, WEEKEND_CONSUMPTION, WEEKDAY_CONSUMPTION, ROAMING     | sub_weekend_weekday.csv               | 0.6427
 
 
 
@@ -402,15 +538,136 @@ at = 1:ncol(boruta.train$ImpHistory), cex.axis = 0.7)
 
 Applying the feature selection, It's obvious that the "TOTAL_CONSUMPTION" and the "X210_USAGE" contributes with a high score accuracy, thus; let's train our model against those two attributes permuting over the rest of the months usage.
 
-//Load the feature selection photos:
+
+We applied feature selection using Azure machine learning, below is a plot showing the importance of training features in order according to their AUC score on percentage
 ```{r}
+features <- read.csv("featureSelectionOriginal.csv")
+features$Score <- features$Score*100
+p1 <- ggplot(features, aes(features$Feature,features$Score,size=Score, label=''))
+p1 <- p1 +geom_point(colour='darkolivegreen3')  + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + theme(panel.background = element_rect(fill = alpha( 'gray', 0.2)))
+p1 + ggtitle("Features for Roaming consumption") + ylab("AUC score in percentage")
+
+featuresWeek <- read.csv("featureWeek.csv")
+featuresWeek$Score <- featuresWeek$Score*100
+p2 <- ggplot(featuresWeek, aes(featuresWeek$Feature,featuresWeek$Score,size=Score, label=''))
+p2 <- p2+geom_point(colour='deepskyblue1')  + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + theme(panel.background = element_rect(fill = alpha( 'gray', 0.2)))
+p2 + ggtitle("Features Using consumption in working days and weekends") 
+
+grid.arrange(p1, p2, ncol=2, main=textGrob("Consumption according to Weekend and Working days Vs Roaming and Local"))
+
+featuresrw <- read.csv("featuresrw.csv")
+featuresrw$Score <- featuresrw$Score*100
+p <- ggplot(featuresrw, aes(featuresrw$Feature,featuresrw$Score,size=Score, label=''))
+p <- p+geom_point(colour='deepskyblue1')  + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + theme(panel.background = element_rect(fill = alpha( 'gray', 0.2)))
+p + xlab("Features for consumption in local, Roaming,weekends and working days") + ylab("AUC score in percentage")
+
+
+featuresContract <- read.csv("featuresAll.csv")
+featuresContract$Score <- featuresContract$Score*100
+p <- ggplot(featuresContract, aes(featuresContract$Feature,featuresContract$Score,size=Score, label=''))
+p <- p+geom_point(colour='darkolivegreen3')  + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + theme(panel.background = element_rect(fill = alpha( 'gray', 0.2)))
+p + ggtitle("Features for Roaming inner join contract_ref") + ylab("AUC score in percentage")
+
 
 ```
 
 We permute over each month, and subtract three months consumption from the total consumption, excluding the consumption of the last month plus one of the other permuted month each time to produce 4 different submission files from each trained model. Below each submission file produced from a trained model and it's accuracy.
 
-//Load the code and submission files
 ```{r}
+## First and Last Month
+train_6_10 <- train
+
+train_6_10  <-  cbind(TOTAL_USAGE = (train_6_10$X209_USAGE + train_6_10$X207_USAGE  +train_6_10$X208_USAGE ), train_6_10)
+
+train_6_10 <-  cbind(TOTAL_SESSIONS = (train_6_10$X209_SESSION_COUNT + train_6_10$X207_SESSION_COUNT  +train_6_10$X208_SESSION_COUNT ), train_6_10)
+
+train_6_10 <- dplyr::select(train_6_10, -c( X209_SESSION_COUNT, X207_SESSION_COUNT, X208_SESSION_COUNT,
+                                        X209_USAGE, X207_USAGE, X208_USAGE ))
+
+train_6_10 <- left_join(train_6_10, local_s, BY = "CONTRACT_KEY")
+train_6_10 <- left_join(train_6_10, local_c, BY = "CONTRACT_KEY")
+train_6_10 <- left_join(train_6_10, roaming_c, BY = "CONTRACT_KEY")
+train_6_10 <- left_join(train_6_10, roaming_s, BY = "CONTRACT_KEY")
+
+train_6_10$ROAMING_USAGE[is.na(train_6_10$ROAMING_USAGE)] = 0
+train_6_10$LOCAL_USAGE[is.na(train_6_10$LOCAL_USAGE)] = 0
+train_6_10$LOCAL_SESSIONS_COUNT[is.na(train_6_10$LOCAL_SESSIONS_COUNT)] = 0
+train_6_10$ROAMING_SESSIONS_COUNT[is.na(train_6_10$ROAMING_SESSIONS_COUNT)] = 0
+train_6_10$LOCAL_USAGE <- train_6_10$LOCAL_USAGE/(1024*1024)
+train_6_10$LOCAL_USAGE <- as.integer(train_6_10$LOCAL_USAGE)
+train_6_10$ROAMING_USAGE <- train_6_10$ROAMING_USAGE/(1024*1024)
+train_6_10$ROAMING_USAGE <- as.integer(train_6_10$ROAMING_USAGE)
+
+train_6_10 <- train_6_10[c(1,2,3,4,5,6,7,9,10,11,12,8)]
+
+
+model <- nn(as.factor(TARGET)~. -CONTRACT_KEY, data= train_6_10)
+predictedFold <- data.frame(predict(model,  train_6_10[1:11], type = "class"))
+auc(as.numeric(train_6_10$TARGET), as.numeric(predictedFold$predict.model..train_6_10.1.11...type....class..))
+
+
+##Second and Last Month
+
+train_7_10 <- train
+train_7_10  <-  cbind(TOTAL_USAGE = (train$X209_USAGE + train$X206_USAGE  +train$X208_USAGE ), train_7_10)
+
+train_7_10 <-  cbind(TOTAL_SESSIONS = (train$X209_SESSION_COUNT + train$X206_SESSION_COUNT  +train$X208_SESSION_COUNT ), train_7_10)
+
+train_7_10 <- dplyr::select(train_7_10, -c( X209_SESSION_COUNT, X206_SESSION_COUNT, X208_SESSION_COUNT,
+                                        X209_USAGE, X206_USAGE, X208_USAGE ))
+train_7_10 <- left_join(train_7_10, local_s, BY = "CONTRACT_KEY")
+train_7_10 <- left_join(train_7_10, local_c, BY = "CONTRACT_KEY")
+train_7_10 <- left_join(train_7_10, roaming_c, BY = "CONTRACT_KEY")
+train_7_10 <- left_join(train_7_10, roaming_s, BY = "CONTRACT_KEY")
+
+train_7_10$ROAMING_USAGE[is.na(train_7_10$ROAMING_USAGE)] = 0
+train_7_10$LOCAL_USAGE[is.na(train_7_10$LOCAL_USAGE)] = 0
+train_7_10$LOCAL_SESSIONS_COUNT[is.na(train_7_10$LOCAL_SESSIONS_COUNT)] = 0
+train_7_10$ROAMING_SESSIONS_COUNT[is.na(train_7_10$ROAMING_SESSIONS_COUNT)] = 0
+train_7_10$LOCAL_USAGE <- train_7_10$LOCAL_USAGE/(1024*1024)
+train_7_10$LOCAL_USAGE <- as.integer(train_7_10$LOCAL_USAGE)
+train_7_10$ROAMING_USAGE <- train_7_10$ROAMING_USAGE/(1024*1024)
+train_7_10$ROAMING_USAGE <- as.integer(train_7_10$ROAMING_USAGE)
+
+train_7_10 <- train_7_10[c(1,2,3,4,5,6,7,9,10,11,12,8)]
+
+model <- nn(as.factor(TARGET)~. -CONTRACT_KEY, data= train_7_10)
+predictedFold <- data.frame(predict(model,  train_7_10[1:11], type = "class"))
+auc(as.numeric(train_7_10$TARGET), as.numeric(predictedFold$predict.model..train_7_10.1.11...type....class..))
+
+### Accuracy of 3rd and last Month
+
+
+train_8_10 <- train
+
+train_8_10  <-  cbind(TOTAL_USAGE = (train$X209_USAGE + train$X206_USAGE  +train$X207_USAGE ), train_8_10)
+
+train_8_10 <-  cbind(TOTAL_SESSIONS = (train$X209_SESSION_COUNT + train$X206_SESSION_COUNT  +train$X207_SESSION_COUNT ), train_8_10)
+
+train_8_10 <- dplyr::select(train_8_10, -c( X209_SESSION_COUNT, X206_SESSION_COUNT, X207_SESSION_COUNT,
+                                        X209_USAGE, X206_USAGE, X207_USAGE ))
+
+train_8_10 <- left_join(train_8_10, local_s, BY = "CONTRACT_KEY")
+train_8_10 <- left_join(train_8_10, local_c, BY = "CONTRACT_KEY")
+train_8_10 <- left_join(train_8_10, roaming_c, BY = "CONTRACT_KEY")
+train_8_10 <- left_join(train_8_10, roaming_s, BY = "CONTRACT_KEY")
+
+train_8_10$ROAMING_USAGE[is.na(train_8_10$ROAMING_USAGE)] = 0
+train_8_10$LOCAL_USAGE[is.na(train_8_10$LOCAL_USAGE)] = 0
+train_8_10$LOCAL_SESSIONS_COUNT[is.na(train_8_10$LOCAL_SESSIONS_COUNT)] = 0
+train_8_10$ROAMING_SESSIONS_COUNT[is.na(train_8_10$ROAMING_SESSIONS_COUNT)] = 0
+train_8_10$LOCAL_USAGE <- train_8_10$LOCAL_USAGE/(1024*1024)
+train_8_10$LOCAL_USAGE <- as.integer(train_8_10$LOCAL_USAGE)
+train_8_10$ROAMING_USAGE <- train_8_10$ROAMING_USAGE/(1024*1024)
+train_8_10$ROAMING_USAGE <- as.integer(train_8_10$ROAMING_USAGE)
+
+train_8_10 <- train_8_10[c(1,2,3,4,5,6,7,9,10,11,12,8)]
+
+
+model <- nn(as.factor(TARGET)~. -CONTRACT_KEY, data= train_8_10)
+predictedFold <- data.frame(predict(model,  train_8_10[1:11], type = "class"))
+auc(as.numeric(train_8_10$TARGET), as.numeric(predictedFold$predict.model..train_8_10.1.11...type....class..))
+
 
 ```
 
